@@ -1,0 +1,79 @@
+// Pure helpers for the task + standup modules. No I/O here — kept side-effect free
+// so they can be unit-tested directly (see src/lib/tasks.test.ts).
+
+export type ReviewerState = "pending" | "approved" | "changes_requested" | "declined";
+
+/** The state "group_name" buckets used by the issues board. */
+export const STATE_GROUPS = ["backlog", "unstarted", "started", "completed", "cancelled"] as const;
+export type StateGroup = (typeof STATE_GROUPS)[number];
+
+/** A state group is "done-like" when finishing a task should count as completing it. */
+export function isCompletedGroup(group: string | null | undefined): boolean {
+  return group === "completed";
+}
+
+/**
+ * Reviewer-state transitions when an issue changes state group, mirroring VYASTA:
+ *  - entering a completed group: the acting user's own PENDING review counts as an approval.
+ *  - leaving a completed group (any active group): prior APPROVED / CHANGES_REQUESTED revert
+ *    to PENDING so the work reads as awaiting a fresh review.
+ * Returns the set of updates a route should apply (empty array = nothing to do).
+ */
+export function reviewerTransitions(
+  toGroup: string | null | undefined,
+  actingUserId: string
+): Array<{ match: { userId?: string; states: ReviewerState[] }; set: { state: ReviewerState; decided: boolean } }> {
+  if (isCompletedGroup(toGroup)) {
+    return [{ match: { userId: actingUserId, states: ["pending"] }, set: { state: "approved", decided: true } }];
+  }
+  return [{ match: { states: ["approved", "changes_requested"] }, set: { state: "pending", decided: false } }];
+}
+
+/** True when a workspace member may see the whole team's standups / activity. */
+export function isManager(opts: { isOwner: boolean; role: number | null | undefined }): boolean {
+  return opts.isOwner || (opts.role ?? 0) >= 15;
+}
+
+// ── Standup date keys ─────────────────────────────────────────────
+// Local-day "YYYY-MM-DD" keys, matching VYASTA's getTodayKey/dateFromKey.
+
+export function todayKey(now: Date = new Date()): string {
+  return dateToKey(now);
+}
+
+export function dateToKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Parse a "YYYY-MM-DD" key into a local-midnight Date. */
+export function keyToDate(key: string): Date {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Map an activity event kind into the weekly summary buckets. */
+export type ActivitySummary = { completed: number; created: number; commented: number; reviewed: number; moved: number; bugs: number };
+
+export function emptyActivitySummary(): ActivitySummary {
+  return { completed: 0, created: 0, commented: 0, reviewed: 0, moved: 0, bugs: 0 };
+}
+
+export function tallyActivity(kinds: string[]): ActivitySummary {
+  const c = emptyActivitySummary();
+  for (const kind of kinds) {
+    if (kind === "completed") c.completed++;
+    else if (kind === "created") c.created++;
+    else if (kind === "commented" || kind === "mentioned") c.commented++;
+    else if (kind === "approved" || kind === "changes_requested") c.reviewed++;
+    else if (kind === "moved" || kind === "changed") c.moved++;
+    else if (kind === "bugged") c.bugs++;
+  }
+  return c;
+}
+
+/** Subtask completion → percent, mirroring taskToVM.progress. */
+export function subtaskProgress(opts: { total: number; done: number; isCompleted: boolean }): number | null {
+  if (opts.isCompleted) return 100;
+  if (opts.total > 0) return Math.round((opts.done / opts.total) * 100);
+  return null;
+}

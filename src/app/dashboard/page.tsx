@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-interface Issue { id: string; name: string; priority: string; sequence_id: number; state: { name: string; group_name: string; color: string } | null; assignee: { display_name: string } | null; created_at: string; target_date: string | null; }
+interface Issue { id: string; name: string; priority: string; sequence_id: number; is_bug?: boolean; subtask_total?: number; subtask_done?: number; state: { name: string; group_name: string; color: string } | null; assignee: { display_name: string } | null; created_at: string; target_date: string | null; }
 interface State { id: string; name: string; group_name: string; color: string; }
 interface Member { user_id: string; profile: { display_name: string } | null; }
 
@@ -24,6 +24,7 @@ export default function IssuesPage() {
   const [newName, setNewName] = useState("");
   const [newPriority, setNewPriority] = useState("none");
   const [newAssignee, setNewAssignee] = useState("");
+  const [newBug, setNewBug] = useState(false);
   const [wsSlug, setWsSlug] = useState("");
   const [projId, setProjId] = useState("");
   const router = useRouter();
@@ -82,10 +83,10 @@ export default function IssuesPage() {
     if (!newName.trim()) return;
     const res = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues`, {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name: newName, priority: newPriority, assignee_id: newAssignee || undefined }),
+      body: JSON.stringify({ name: newName, priority: newPriority, assignee_ids: newAssignee ? [newAssignee] : [], is_bug: newBug }),
     });
     const json = await res.json();
-    if (json.success) { setNewName(""); setShowCreate(false); loadIssues(); }
+    if (json.success) { setNewName(""); setNewBug(false); setShowCreate(false); loadIssues(); }
   }
 
   const groupByState = (state: string) => {
@@ -124,6 +125,9 @@ export default function IssuesPage() {
                 <option value="">Unassigned</option>
                 {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profile?.display_name || m.user_id.slice(0, 8)}</option>)}
               </select>
+              <label className="flex items-center gap-2 text-sm text-[#5e6574] cursor-pointer">
+                <input type="checkbox" checked={newBug} onChange={e => setNewBug(e.target.checked)} /> 🐞 This is a bug
+              </label>
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setShowCreate(false)} className="rounded-lg px-3 py-2 text-sm text-[#5e6574] hover:bg-[#f1f3f8]">Cancel</button>
@@ -165,10 +169,13 @@ export default function IssuesPage() {
               <div className="space-y-2">
                 {items.map(issue => (
                   <Link key={issue.id} href={`/dashboard/issues/${issue.id}?ws=${wsSlug}&proj=${projId}`} className="block rounded-lg bg-white p-3 shadow-sm border border-[#eef0f6] hover:border-[#3f76ff]/30 transition-colors">
-                    <p className="text-sm font-medium text-[#1a1d23] mb-2 line-clamp-2">{issue.name}</p>
+                    <p className="text-sm font-medium text-[#1a1d23] mb-2 line-clamp-2">{issue.is_bug && <span className="mr-1">🐞</span>}{issue.name}</p>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: PRIO_COLORS[issue.priority] + "20", color: PRIO_COLORS[issue.priority] }}>{issue.priority}</span>
-                      {issue.assignee && <span className="text-[10px] text-[#9ca3af]">{issue.assignee.display_name}</span>}
+                      <div className="flex items-center gap-1.5">
+                        {!!issue.subtask_total && <span className="text-[10px] text-[#9ca3af]">{issue.subtask_done}/{issue.subtask_total}</span>}
+                        {issue.assignee && <span className="text-[10px] text-[#9ca3af]">{issue.assignee.display_name}</span>}
+                      </div>
                     </div>
                   </Link>
                 ))}

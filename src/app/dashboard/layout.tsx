@@ -34,7 +34,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <span className="font-semibold text-sm text-[#1a1d23]">Digisystem</span>
         </div>
         <nav className="flex-1 p-2 space-y-0.5">
-          <NavItem href="/dashboard" icon="◻" label="Tasks" active={pathname.startsWith("/dashboard") && !pathname.includes("/analytics")} />
+          <NavItem href="/dashboard" icon="◻" label="Tasks" active={pathname === "/dashboard" || pathname.startsWith("/dashboard/issues")} />
+          <NavItem href="/dashboard/my-tasks" icon="🧑" label="My Tasks" active={pathname.startsWith("/dashboard/my-tasks")} />
+          <NavItem href="/dashboard/standup" icon="🗓" label="Standup" active={pathname.startsWith("/dashboard/standup")} />
           <NavItem href="/dashboard/analytics" icon="📊" label="Analytics" active={pathname.includes("/analytics")} />
         </nav>
         <div className="border-t border-[#eef0f6] p-3">
