@@ -34,6 +34,25 @@ export function isManager(opts: { isOwner: boolean; role: number | null | undefi
   return opts.isOwner || (opts.role ?? 0) >= 15;
 }
 
+// ── Workspace roles ───────────────────────────────────────────────
+export const MEMBER_ROLE = 5;
+export const MANAGER_ROLE = 15;
+
+/** Roles that can be assigned through the members UI (owner is set via owner_id, not here). */
+export const ASSIGNABLE_ROLES = [
+  { value: MEMBER_ROLE, label: "Member" },
+  { value: MANAGER_ROLE, label: "Manager" },
+] as const;
+
+export function isAssignableRole(role: unknown): role is number {
+  return ASSIGNABLE_ROLES.some((r) => r.value === role);
+}
+
+/** Display label for a stored role number (owner is handled separately by the caller). */
+export function roleLabel(role: number | null | undefined): string {
+  return (role ?? 0) >= MANAGER_ROLE ? "Manager" : "Member";
+}
+
 // ── Standup date keys ─────────────────────────────────────────────
 // Local-day "YYYY-MM-DD" keys, matching VYASTA's getTodayKey/dateFromKey.
 

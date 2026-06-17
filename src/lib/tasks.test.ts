@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   isCompletedGroup, reviewerTransitions, isManager,
   todayKey, dateToKey, keyToDate, tallyActivity, subtaskProgress,
+  isAssignableRole, roleLabel, MEMBER_ROLE, MANAGER_ROLE,
 } from "./tasks";
 
 describe("isCompletedGroup", () => {
@@ -60,6 +61,22 @@ describe("tallyActivity", () => {
   });
   it("ignores unknown kinds", () => {
     expect(tallyActivity(["nonsense"]).completed).toBe(0);
+  });
+});
+
+describe("workspace roles", () => {
+  it("only Member/Manager roles are assignable via the UI", () => {
+    expect(isAssignableRole(MEMBER_ROLE)).toBe(true);
+    expect(isAssignableRole(MANAGER_ROLE)).toBe(true);
+    expect(isAssignableRole(20)).toBe(false); // owner tier — not settable here
+    expect(isAssignableRole(7)).toBe(false);
+    expect(isAssignableRole(null)).toBe(false);
+  });
+  it("labels roles by manager threshold", () => {
+    expect(roleLabel(MEMBER_ROLE)).toBe("Member");
+    expect(roleLabel(MANAGER_ROLE)).toBe("Manager");
+    expect(roleLabel(20)).toBe("Manager");
+    expect(roleLabel(null)).toBe("Member");
   });
 });
 
