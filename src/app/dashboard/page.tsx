@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { deriveIdentifier } from "@/lib/tasks";
 
 interface Issue { id: string; name: string; priority: string; sequence_id: number; is_bug?: boolean; subtask_total?: number; subtask_done?: number; state: { name: string; group_name: string; color: string } | null; assignee: { display_name: string } | null; created_at: string; target_date: string | null; }
@@ -29,6 +28,8 @@ export default function IssuesPage() {
   const [wsSlug, setWsSlug] = useState("");
   const [projId, setProjId] = useState("");
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
   const [showProj, setShowProj] = useState(false);
   const [newProjName, setNewProjName] = useState("");
   const router = useRouter();
@@ -54,12 +55,14 @@ export default function IssuesPage() {
     setProjects(projJson.data);
     const pid = projJson.data[0].id;
 
-    // Assignable people = workspace members (manage them on the Members page).
-    const memberRes = await fetch(`/api/workspaces/${slug}/members`, { headers: { Authorization: `Bearer ${token}` } });
-    const mJson = await memberRes.json();
-    if (mJson.success) setMembers((mJson.data.members || []).map((m: any) => ({ user_id: m.user_id, profile: m.profile })));
-
-    await selectProject(pid, slug);
+    setProjId(pid);
+    // Members, states, and issues don't depend on each other — fetch them in parallel.
+    const h = { headers: { Authorization: `Bearer ${token}` } };
+    await Promise.all([
+      fetch(`/api/workspaces/${slug}/members`, h).then(r => r.json()).then(j => { if (j.success) setMembers((j.data.members || []).map((m: any) => ({ user_id: m.user_id, profile: m.profile }))); }),
+      fetch(`/api/workspaces/${slug}/projects/${pid}/states`, h).then(r => r.json()).then(j => { if (j.success) setStates(j.data); }),
+      loadIssues(slug, pid),
+    ]);
   }
 
   async function selectProject(pid: string, slug = wsSlug) {
@@ -115,6 +118,19 @@ export default function IssuesPage() {
     }
     return gs;
   };
+
+  async function moveIssueToGroup(issueId: string, group: string) {
+    const target = states.find(s => s.group_name === group);
+    const issue = issues.find(i => i.id === issueId);
+    if (!target || !issue || issue.state?.group_name === group) return;
+    // Optimistic move, then persist.
+    setIssues(prev => prev.map(i => i.id === issueId ? { ...i, state: { name: target.name, group_name: target.group_name, color: target.color } } : i));
+    await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${issueId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ state_id: target.id }),
+    });
+    loadIssues();
+  }
 
   if (loading) return <div className="flex h-full items-center justify-center text-[#5e6574]">Loading tasks...</div>;
 
@@ -202,15 +218,26 @@ export default function IssuesPage() {
           const cols = groupByState(group);
           const items = cols[group] || [];
           const stateInfo = states.find(s => s.group_name === group);
+          const isOver = dragOverGroup === group;
+          const droppable = !!states.find(s => s.group_name === group);
           return (
-            <div key={group} className="rounded-xl bg-[#f1f3f8] p-3">
+            <div key={group}
+              onDragOver={e => { if (droppable) { e.preventDefault(); setDragOverGroup(group); } }}
+              onDragLeave={() => setDragOverGroup(g => g === group ? null : g)}
+              onDrop={() => { if (dragId) moveIssueToGroup(dragId, group); setDragId(null); setDragOverGroup(null); }}
+              className={`rounded-xl p-3 transition-colors ${isOver ? "bg-[#e6ecfb] ring-2 ring-[#3f76ff]/40" : "bg-[#f1f3f8]"}`}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-[#5e6574]" style={{ color: stateInfo?.color }}>{stateInfo?.name || group}</span>
                 <span className="text-xs text-[#9ca3af]">{items.length}</span>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 min-h-[40px]">
                 {items.map(issue => (
-                  <Link key={issue.id} href={`/dashboard/issues/${issue.id}?ws=${wsSlug}&proj=${projId}`} className="block rounded-lg bg-white p-3 shadow-sm border border-[#eef0f6] hover:border-[#3f76ff]/30 transition-colors">
+                  <div key={issue.id} draggable
+                    onDragStart={() => setDragId(issue.id)}
+                    onDragEnd={() => { setDragId(null); setDragOverGroup(null); }}
+                    onClick={() => router.push(`/dashboard/issues/${issue.id}?ws=${wsSlug}&proj=${projId}`)}
+                    title="Drag to move • click to open"
+                    className={`rounded-lg bg-white p-3 shadow-sm border border-[#eef0f6] hover:border-[#3f76ff]/30 transition-all cursor-pointer active:cursor-grabbing ${dragId === issue.id ? "opacity-50" : ""}`}>
                     <p className="text-sm font-medium text-[#1a1d23] mb-2 line-clamp-2">{issue.is_bug && <span className="mr-1">🐞</span>}{issue.name}</p>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: PRIO_COLORS[issue.priority] + "20", color: PRIO_COLORS[issue.priority] }}>{issue.priority}</span>
@@ -219,9 +246,9 @@ export default function IssuesPage() {
                         {issue.assignee && <span className="text-[10px] text-[#9ca3af]">{issue.assignee.display_name}</span>}
                       </div>
                     </div>
-                  </Link>
+                  </div>
                 ))}
-                {items.length === 0 && <p className="text-xs text-[#9ca3af] text-center py-4">No tasks</p>}
+                {items.length === 0 && <p className="text-xs text-[#9ca3af] text-center py-4">{isOver ? "Drop here" : "No tasks"}</p>}
               </div>
             </div>
           );

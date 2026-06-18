@@ -22,8 +22,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (!json.success) { localStorage.removeItem("token"); router.push("/login"); return; }
       setUser(json.data.user);
       setProfile(json.data.profile);
-      // Ensure the user has a workspace + project before any page loads.
-      await fetch("/api/bootstrap", { method: "POST", headers }).catch(() => {});
+      // Ensure the user has a workspace + project — but only the first time per user;
+      // subsequent loads skip this round-trip so the dashboard renders faster.
+      const bootKey = `bootstrapped:${json.data.user.id}`;
+      if (!localStorage.getItem(bootKey)) {
+        await fetch("/api/bootstrap", { method: "POST", headers }).catch(() => {});
+        localStorage.setItem(bootKey, "1");
+      }
       setReady(true);
     });
   }, [router]);
