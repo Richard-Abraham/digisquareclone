@@ -54,7 +54,9 @@ export default function IssuesPage() {
     const projJson = await projRes.json();
     if (!projJson.success || !projJson.data.length) { setLoading(false); return; }
     setProjects(projJson.data);
-    const pid = projJson.data[0].id;
+    // Restore the last project the user had selected (if it's still accessible), else default to the first.
+    const lastPid = localStorage.getItem(`lastProject:${slug}`);
+    const pid = (lastPid && projJson.data.some((p: any) => p.id === lastPid)) ? lastPid : projJson.data[0].id;
 
     setProjId(pid);
     // Members, states, and issues don't depend on each other — fetch them in parallel.
@@ -68,6 +70,7 @@ export default function IssuesPage() {
 
   async function selectProject(pid: string, slug = wsSlug) {
     setProjId(pid);
+    localStorage.setItem(`lastProject:${slug}`, pid);
     const sRes = await fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { headers: { Authorization: `Bearer ${token}` } });
     const sJson = await sRes.json();
     if (sJson.success) setStates(sJson.data);

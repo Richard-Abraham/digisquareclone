@@ -51,6 +51,14 @@ export function UsersIcon() {
   );
 }
 
+export function FolderIcon() {
+  return (
+    <svg {...base()} width={18} height={18}>
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8A2 2 0 0 1 21 9.5V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+    </svg>
+  );
+}
+
 export function ChartIcon() {
   return (
     <svg {...base()} width={18} height={18}>

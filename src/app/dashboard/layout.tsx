@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { TasksIcon, UserIcon, CalendarIcon, BellIcon, UsersIcon, ChartIcon } from "@/components/icons";
+import { TasksIcon, UserIcon, CalendarIcon, BellIcon, UsersIcon, ChartIcon, FolderIcon } from "@/components/icons";
 
 interface User { id: string; email: string; }
 interface Profile { display_name: string; avatar?: string; }
@@ -62,6 +62,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <NavItem href="/dashboard/my-tasks" icon={<UserIcon />} label="My Tasks" active={pathname.startsWith("/dashboard/my-tasks")} />
           <NavItem href="/dashboard/standup" icon={<CalendarIcon />} label="Standup" active={pathname.startsWith("/dashboard/standup")} />
           <NavItem href="/dashboard/notifications" icon={<BellIcon />} label="Notifications" active={pathname.startsWith("/dashboard/notifications")} badge={unread} />
+          <NavItem href="/dashboard/projects" icon={<FolderIcon />} label="Projects" active={pathname.startsWith("/dashboard/projects")} />
           <NavItem href="/dashboard/members" icon={<UsersIcon />} label="Members" active={pathname.startsWith("/dashboard/members")} />
           <NavItem href="/dashboard/analytics" icon={<ChartIcon />} label="Analytics" active={pathname.includes("/analytics")} />
         </nav>
