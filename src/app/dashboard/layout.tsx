@@ -10,6 +10,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [ready, setReady] = useState(false);
+  const [unread, setUnread] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -27,6 +28,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     });
   }, [router]);
 
+  // Keep the notification badge fresh: on navigation and on a light poll.
+  useEffect(() => {
+    if (!ready) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
+    const refresh = () => fetch("/api/notifications", { headers })
+      .then(r => r.json()).then(j => { if (j.success) setUnread(j.data.unread); }).catch(() => {});
+    refresh();
+    const t = setInterval(refresh, 30000);
+    return () => clearInterval(t);
+  }, [ready, pathname]);
+
   if (!user || !ready) return <div className="flex h-screen items-center justify-center text-[#5e6574]">Loading...</div>;
 
   return (
@@ -41,6 +55,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <NavItem href="/dashboard" icon="◻" label="Tasks" active={pathname === "/dashboard" || pathname.startsWith("/dashboard/issues")} />
           <NavItem href="/dashboard/my-tasks" icon="🧑" label="My Tasks" active={pathname.startsWith("/dashboard/my-tasks")} />
           <NavItem href="/dashboard/standup" icon="🗓" label="Standup" active={pathname.startsWith("/dashboard/standup")} />
+          <NavItem href="/dashboard/notifications" icon="🔔" label="Notifications" active={pathname.startsWith("/dashboard/notifications")} badge={unread} />
           <NavItem href="/dashboard/members" icon="👥" label="Members" active={pathname.startsWith("/dashboard/members")} />
           <NavItem href="/dashboard/analytics" icon="📊" label="Analytics" active={pathname.includes("/analytics")} />
         </nav>
@@ -61,11 +76,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 }
 
-function NavItem({ href, icon, label, active }: { href: string; icon: string; label: string; active: boolean }) {
+function NavItem({ href, icon, label, active, badge }: { href: string; icon: string; label: string; active: boolean; badge?: number }) {
   return (
     <Link href={href} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${active ? "bg-[#eef3ff] text-[#3f76ff] font-medium" : "text-[#5e6574] hover:bg-[#f1f3f8]"}`}>
       <span className="text-base">{icon}</span>
-      {label}
+      <span className="flex-1">{label}</span>
+      {!!badge && badge > 0 && (
+        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">{badge > 99 ? "99+" : badge}</span>
+      )}
     </Link>
   );
 }

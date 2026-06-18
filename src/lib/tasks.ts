@@ -90,6 +90,11 @@ export function tallyActivity(kinds: string[]): ActivitySummary {
   return c;
 }
 
+/** Notification kind for an assignment — bugs get their own kind/styling. */
+export function assignmentNotificationKind(isBug: boolean): "bug" | "assigned" {
+  return isBug ? "bug" : "assigned";
+}
+
 /** Subtask completion → percent, mirroring taskToVM.progress. */
 export function subtaskProgress(opts: { total: number; done: number; isCompleted: boolean }): number | null {
   if (opts.isCompleted) return 100;

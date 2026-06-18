@@ -3,6 +3,7 @@ import {
   isCompletedGroup, reviewerTransitions, isManager,
   todayKey, dateToKey, keyToDate, tallyActivity, subtaskProgress,
   isAssignableRole, roleLabel, MEMBER_ROLE, MANAGER_ROLE,
+  assignmentNotificationKind,
 } from "./tasks";
 
 describe("isCompletedGroup", () => {
@@ -77,6 +78,13 @@ describe("workspace roles", () => {
     expect(roleLabel(MANAGER_ROLE)).toBe("Manager");
     expect(roleLabel(20)).toBe("Manager");
     expect(roleLabel(null)).toBe("Member");
+  });
+});
+
+describe("assignmentNotificationKind", () => {
+  it("bugs notify as 'bug', everything else as 'assigned'", () => {
+    expect(assignmentNotificationKind(true)).toBe("bug");
+    expect(assignmentNotificationKind(false)).toBe("assigned");
   });
 });
 

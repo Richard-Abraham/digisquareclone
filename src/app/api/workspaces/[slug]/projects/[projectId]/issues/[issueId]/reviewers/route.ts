@@ -3,6 +3,7 @@ import { getAdmin } from "@/lib/supabase";
 import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { writeActivity } from "@/lib/activity";
+import { writeNotifications } from "@/lib/notifications";
 import { ensureProjectMembers } from "@/lib/access";
 import type { ReviewerState } from "@/lib/tasks";
 
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: { projectId: 
     .upsert(ids.map((uid) => ({ issue_id: params.issueId, user_id: uid, state: "pending" })), { onConflict: "issue_id,user_id", ignoreDuplicates: true });
   if (e) return err(e.message, 400);
   await ensureProjectMembers(params.projectId, ids);
+  await writeNotifications(ids, { workspaceId: issue.workspace_id, actorId: user.id, kind: "review_request", issueId: params.issueId, projectId: params.projectId });
   await writeActivity({ workspaceId: issue.workspace_id, actorId: user.id, kind: "review_requested", targetType: "issue", issueId: params.issueId, projectId: params.projectId });
   return ok({ added: ids.length });
 }

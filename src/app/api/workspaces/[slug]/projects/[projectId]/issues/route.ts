@@ -3,7 +3,9 @@ import { getAdmin } from "@/lib/supabase";
 import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { writeActivity } from "@/lib/activity";
+import { writeNotifications } from "@/lib/notifications";
 import { ensureProjectMembers } from "@/lib/access";
+import { assignmentNotificationKind } from "@/lib/tasks";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string; projectId: string } }) {
   const user = await getUser(req);
@@ -90,6 +92,16 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
   // Assigning/reviewing grants project access; the creator is always a member too.
   await ensureProjectMembers(params.projectId, [user.id, ...assigneeIds, ...reviewerIds]);
+
+  // Notify the people this task lands on.
+  await writeNotifications(assigneeIds, {
+    workspaceId: project.workspace_id, actorId: user.id,
+    kind: assignmentNotificationKind(!!body.is_bug), issueId: issue.id, projectId: params.projectId, snippet: body.name,
+  });
+  await writeNotifications(reviewerIds, {
+    workspaceId: project.workspace_id, actorId: user.id,
+    kind: "review_request", issueId: issue.id, projectId: params.projectId, snippet: body.name,
+  });
 
   await writeActivity({
     workspaceId: project.workspace_id, actorId: user.id, kind: body.is_bug ? "bugged" : "created",
