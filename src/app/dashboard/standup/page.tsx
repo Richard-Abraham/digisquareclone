@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { CheckIcon } from "@/components/icons";
+import { todayKey } from "@/lib/tasks";
 
 interface TaskRef { issue_id: string; title: string; ref: number | null; project_name: string; completed?: boolean }
 interface Standup {
@@ -31,9 +32,12 @@ export default function StandupPage() {
   const [savingPlan, setSavingPlan] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
 
+  const [teamDate, setTeamDate] = useState(todayKey());
+
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historyUserId, setHistoryUserId] = useState("");
 
   useEffect(() => {
     if (typeof window !== "undefined" && !localStorage.getItem("token")) { router.push("/login"); return; }
@@ -59,6 +63,16 @@ export default function StandupPage() {
 
   useEffect(() => { loadToday(); }, [loadToday]);
 
+  // Managers can browse any day's team standups without disturbing their own
+  // (always-today) plan/report editor above.
+  const loadTeamForDate = useCallback(async (date: string) => {
+    if (!slug) return;
+    const data = await api<{ team_standups: TeamRow[] }>(`/api/workspaces/${slug}/standup?date=${date}`);
+    setTeam(data.team_standups);
+  }, [slug]);
+
+  useEffect(() => { if (isManager && teamDate !== todayKey()) loadTeamForDate(teamDate); }, [teamDate, isManager, loadTeamForDate]);
+
   async function savePlan() {
     setSavingPlan(true);
     try { await api(`/api/workspaces/${slug}/standup/plan`, { method: "POST", body: { plan, issue_ids: planIds } }); await loadToday(); }
@@ -81,13 +95,18 @@ export default function StandupPage() {
   async function loadHistory(reset = false) {
     if (!slug) return;
     const c = reset ? null : cursor;
-    const res = await api<{ items: HistoryItem[]; next_cursor: string | null }>(`/api/workspaces/${slug}/standup/history${c ? `?cursor=${c}` : ""}`);
+    const params = new URLSearchParams();
+    if (c) params.set("cursor", c);
+    if (isManager && historyUserId) params.set("userId", historyUserId);
+    const qs = params.toString();
+    const res = await api<{ items: HistoryItem[]; next_cursor: string | null }>(`/api/workspaces/${slug}/standup/history${qs ? `?${qs}` : ""}`);
     setHistory((prev) => reset ? res.items : [...prev, ...res.items]);
     setCursor(res.next_cursor);
     setHistoryLoaded(true);
   }
 
   useEffect(() => { if (tab === "history" && !historyLoaded) loadHistory(true); }, [tab]); // eslint-disable-line
+  useEffect(() => { if (tab === "history" && historyLoaded) loadHistory(true); }, [historyUserId]); // eslint-disable-line
 
   const submitted = !!mine?.submitted_at;
   const planTaskRefs = (mine?.plan_tasks ?? []).concat(
@@ -179,7 +198,11 @@ export default function StandupPage() {
           {/* Team standups (managers) */}
           {isManager && (
             <section className="col-span-3 bg-white rounded-xl border border-[#eef0f6] p-5">
-              <h2 className="font-semibold text-sm text-[#1a1d23] mb-3">Team standups today</h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold text-sm text-[#1a1d23]">{teamDate === todayKey() ? "Team standups today" : `Team standups — ${new Date(teamDate).toLocaleDateString()}`}</h2>
+                <input type="date" value={teamDate} max={todayKey()} onChange={(e) => setTeamDate(e.target.value)}
+                  className="rounded-lg border border-[#e2e6ef] px-2 py-1 text-xs outline-none focus:border-[#3f76ff]" />
+              </div>
               <div className="space-y-2">
                 {team.map((row) => (
                   <div key={row.user_id} className="flex items-start gap-3 border-b border-[#f1f3f8] pb-2 last:border-0">
@@ -204,6 +227,15 @@ export default function StandupPage() {
 
       {tab === "history" && (
         <div className="space-y-3">
+          {isManager && (
+            <div className="flex justify-end">
+              <select value={historyUserId} onChange={(e) => setHistoryUserId(e.target.value)}
+                className="rounded-lg border border-[#e2e6ef] px-2 py-1.5 text-xs outline-none bg-white">
+                <option value="">Everyone</option>
+                {team.map((t) => <option key={t.user_id} value={t.user_id}>{t.profile?.display_name || t.user_id.slice(0, 8)}</option>)}
+              </select>
+            </div>
+          )}
           {history.length === 0 && <p className="text-sm text-[#9ca3af] text-center py-8">No submitted standups yet.</p>}
           {history.map((h) => (
             <div key={h.id} className="bg-white rounded-xl border border-[#eef0f6] p-4">
