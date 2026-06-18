@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { BugIcon } from "@/components/icons";
 
 interface Task {
   id: string; name: string; priority: string; sequence_id: number; is_bug: boolean;
@@ -72,7 +73,7 @@ export default function MyTasksPage() {
             <Link key={t.id} href={`/dashboard/issues/${t.id}?ws=${slug}&proj=${t.project?.id ?? ""}`}
               className="flex items-center gap-3 rounded-lg bg-white border border-[#eef0f6] px-4 py-3 hover:border-[#3f76ff]/30 transition-colors">
               <span className="text-[10px] text-[#9ca3af] w-10">#{t.sequence_id}</span>
-              {t.is_bug && <span className="text-[10px]">🐞</span>}
+              {t.is_bug && <BugIcon size={12} />}
               <span className="flex-1 text-sm font-medium text-[#1a1d23] truncate">{t.name}</span>
               {t.subtask_total > 0 && <span className="text-[10px] text-[#9ca3af]">{t.subtask_done}/{t.subtask_total}</span>}
               <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: PRIO_COLORS[t.priority] + "20", color: PRIO_COLORS[t.priority] }}>{t.priority}</span>

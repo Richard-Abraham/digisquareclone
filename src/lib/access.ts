@@ -31,6 +31,29 @@ export async function getIssueContext(issueId: string, userId: string): Promise<
   return { issue, access: { workspace: ws, role: m?.role ?? null, isManager: isManager({ isOwner, role: m?.role ?? null }) } };
 }
 
+export interface ProjectAccess {
+  workspaceId: string;
+  isManager: boolean;
+}
+
+/** Resolve a project's workspace and assert the user can work in it: workspace
+ *  managers/the owner always can; other workspace members need an explicit
+ *  project_members row. Returns null if the user has no access at all. */
+export async function getProjectAccess(projectId: string, userId: string): Promise<ProjectAccess | null> {
+  const { data: project } = await getAdmin().from("projects").select("workspace_id").eq("id", projectId).single();
+  if (!project) return null;
+  const { data: ws } = await getAdmin().from("workspaces").select("id, owner_id").eq("id", project.workspace_id).single();
+  if (!ws) return null;
+  const { data: m } = await getAdmin().from("workspace_members").select("role").eq("workspace_id", ws.id).eq("user_id", userId).single();
+  const isOwner = ws.owner_id === userId;
+  if (!m && !isOwner) return null;
+  const manager = isManager({ isOwner, role: m?.role ?? null });
+  if (manager) return { workspaceId: ws.id, isManager: true };
+  const { data: pm } = await getAdmin().from("project_members").select("user_id").eq("project_id", projectId).eq("user_id", userId).maybeSingle();
+  if (!pm) return null;
+  return { workspaceId: ws.id, isManager: false };
+}
+
 const DEFAULT_STATES = [
   { group: "backlog", name: "Backlog", color: "#a3a3a3", seq: 15000 },
   { group: "unstarted", name: "Todo", color: "#3f76ff", seq: 30000 },

@@ -4,12 +4,13 @@ import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { writeActivity } from "@/lib/activity";
 import { writeNotifications } from "@/lib/notifications";
-import { ensureProjectMembers } from "@/lib/access";
+import { ensureProjectMembers, getProjectAccess } from "@/lib/access";
 import { assignmentNotificationKind } from "@/lib/tasks";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string; projectId: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
+  if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
 
   const url = new URL(req.url);
   const state = url.searchParams.get("state");
@@ -57,6 +58,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 export async function POST(req: NextRequest, { params }: { params: { slug: string; projectId: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
+  if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
 
   const { data: project } = await getAdmin().from("projects").select("workspace_id").eq("id", params.projectId).single();
   if (!project) return err("Project not found", 404);

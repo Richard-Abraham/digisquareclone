@@ -4,10 +4,12 @@ import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { writeActivity } from "@/lib/activity";
 import { reviewerTransitions, isCompletedGroup } from "@/lib/tasks";
+import { getProjectAccess } from "@/lib/access";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string; projectId: string; issueId: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
+  if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
   const { data } = await getAdmin().from("issues").select(
     "*, state:states(*), assignees:issue_assignees(user_id), tags:issue_tags(tag_id)"
   ).eq("id", params.issueId).single();
@@ -28,6 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 export async function PATCH(req: NextRequest, { params }: { params: { slug: string; projectId: string; issueId: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
+  if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
   const body = await req.json() as Record<string, unknown>;
 
   const { data: before } = await getAdmin().from("issues")
@@ -73,6 +76,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
 export async function DELETE(req: NextRequest, { params }: { params: { slug: string; projectId: string; issueId: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
+  if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
   await getAdmin().from("issues").delete().eq("id", params.issueId);
   return ok({ deleted: true });
 }

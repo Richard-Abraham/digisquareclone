@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { deriveIdentifier } from "@/lib/tasks";
+import { BugIcon } from "@/components/icons";
 
 interface Issue { id: string; name: string; priority: string; sequence_id: number; is_bug?: boolean; subtask_total?: number; subtask_done?: number; state: { name: string; group_name: string; color: string } | null; assignee: { display_name: string } | null; created_at: string; target_date: string | null; }
 interface State { id: string; name: string; group_name: string; color: string; }
@@ -134,6 +135,17 @@ export default function IssuesPage() {
 
   if (loading) return <div className="flex h-full items-center justify-center text-[#5e6574]">Loading tasks...</div>;
 
+  if (wsSlug && projects.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center text-center px-6">
+        <div className="max-w-sm">
+          <p className="text-sm font-medium text-[#1a1d23] mb-1">No project access yet</p>
+          <p className="text-sm text-[#5e6574]">A manager needs to add you to a project before you can see its board. Ask them to add you under Members → Project access.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
@@ -184,7 +196,7 @@ export default function IssuesPage() {
                 {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profile?.display_name || m.user_id.slice(0, 8)}</option>)}
               </select>
               <label className="flex items-center gap-2 text-sm text-[#5e6574] cursor-pointer">
-                <input type="checkbox" checked={newBug} onChange={e => setNewBug(e.target.checked)} /> 🐞 This is a bug
+                <input type="checkbox" checked={newBug} onChange={e => setNewBug(e.target.checked)} /> <BugIcon /> This is a bug
               </label>
             </div>
             <div className="flex justify-end gap-2 mt-4">
@@ -238,7 +250,7 @@ export default function IssuesPage() {
                     onClick={() => router.push(`/dashboard/issues/${issue.id}?ws=${wsSlug}&proj=${projId}`)}
                     title="Drag to move • click to open"
                     className={`rounded-lg bg-white p-3 shadow-sm border border-[#eef0f6] hover:border-[#3f76ff]/30 transition-all cursor-pointer active:cursor-grabbing ${dragId === issue.id ? "opacity-50" : ""}`}>
-                    <p className="text-sm font-medium text-[#1a1d23] mb-2 line-clamp-2">{issue.is_bug && <span className="mr-1">🐞</span>}{issue.name}</p>
+                    <p className="text-sm font-medium text-[#1a1d23] mb-2 line-clamp-2">{issue.is_bug && <BugIcon className="inline mr-1 -mt-0.5" />}{issue.name}</p>
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: PRIO_COLORS[issue.priority] + "20", color: PRIO_COLORS[issue.priority] }}>{issue.priority}</span>
                       <div className="flex items-center gap-1.5">

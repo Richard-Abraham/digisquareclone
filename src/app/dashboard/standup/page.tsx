@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { CheckIcon } from "@/components/icons";
 
 interface TaskRef { issue_id: string; title: string; ref: number | null; project_name: string; completed?: boolean }
 interface Standup {
@@ -135,7 +136,7 @@ export default function StandupPage() {
             <section className="bg-white rounded-xl border border-[#eef0f6] p-5">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-semibold text-sm text-[#1a1d23]">End-of-day report</h2>
-                {submitted && <span className="text-[10px] text-[#16a34a] font-medium">✓ Submitted {new Date(mine!.submitted_at!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
+                {submitted && <span className="flex items-center gap-1 text-[10px] text-[#16a34a] font-medium"><CheckIcon size={11} /> Submitted {new Date(mine!.submitted_at!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
               </div>
               <textarea value={report} onChange={(e) => setReport(e.target.value)} disabled={submitted} rows={3} placeholder="What did you accomplish?"
                 className="w-full rounded-lg border border-[#e2e6ef] px-3 py-2 text-sm outline-none focus:border-[#3f76ff] resize-none disabled:bg-[#f8f9fc]" />
@@ -215,7 +216,7 @@ export default function StandupPage() {
               {h.report_tasks.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {h.report_tasks.map((t) => (
-                    <span key={t.issue_id} className={`text-[10px] px-1.5 py-0.5 rounded ${t.completed ? "bg-[#dcfce7] text-[#16a34a]" : "bg-[#f1f3f8] text-[#5e6574]"}`}>{t.completed ? "✓ " : ""}{t.title}</span>
+                    <span key={t.issue_id} className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${t.completed ? "bg-[#dcfce7] text-[#16a34a]" : "bg-[#f1f3f8] text-[#5e6574]"}`}>{t.completed && <CheckIcon size={10} />}{t.title}</span>
                   ))}
                 </div>
               )}

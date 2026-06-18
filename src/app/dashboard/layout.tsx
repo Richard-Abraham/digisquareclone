@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { TasksIcon, UserIcon, CalendarIcon, BellIcon, UsersIcon, ChartIcon } from "@/components/icons";
 
 interface User { id: string; email: string; }
 interface Profile { display_name: string; avatar?: string; }
@@ -57,12 +58,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <span className="font-semibold text-sm text-[#1a1d23]">Digisystem</span>
         </div>
         <nav className="flex-1 p-2 space-y-0.5">
-          <NavItem href="/dashboard" icon="◻" label="Tasks" active={pathname === "/dashboard" || pathname.startsWith("/dashboard/issues")} />
-          <NavItem href="/dashboard/my-tasks" icon="🧑" label="My Tasks" active={pathname.startsWith("/dashboard/my-tasks")} />
-          <NavItem href="/dashboard/standup" icon="🗓" label="Standup" active={pathname.startsWith("/dashboard/standup")} />
-          <NavItem href="/dashboard/notifications" icon="🔔" label="Notifications" active={pathname.startsWith("/dashboard/notifications")} badge={unread} />
-          <NavItem href="/dashboard/members" icon="👥" label="Members" active={pathname.startsWith("/dashboard/members")} />
-          <NavItem href="/dashboard/analytics" icon="📊" label="Analytics" active={pathname.includes("/analytics")} />
+          <NavItem href="/dashboard" icon={<TasksIcon />} label="Tasks" active={pathname === "/dashboard" || pathname.startsWith("/dashboard/issues")} />
+          <NavItem href="/dashboard/my-tasks" icon={<UserIcon />} label="My Tasks" active={pathname.startsWith("/dashboard/my-tasks")} />
+          <NavItem href="/dashboard/standup" icon={<CalendarIcon />} label="Standup" active={pathname.startsWith("/dashboard/standup")} />
+          <NavItem href="/dashboard/notifications" icon={<BellIcon />} label="Notifications" active={pathname.startsWith("/dashboard/notifications")} badge={unread} />
+          <NavItem href="/dashboard/members" icon={<UsersIcon />} label="Members" active={pathname.startsWith("/dashboard/members")} />
+          <NavItem href="/dashboard/analytics" icon={<ChartIcon />} label="Analytics" active={pathname.includes("/analytics")} />
         </nav>
         <div className="border-t border-[#eef0f6] p-3">
           <div className="flex items-center gap-2">
@@ -81,10 +82,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 }
 
-function NavItem({ href, icon, label, active, badge }: { href: string; icon: string; label: string; active: boolean; badge?: number }) {
+function NavItem({ href, icon, label, active, badge }: { href: string; icon: React.ReactNode; label: string; active: boolean; badge?: number }) {
   return (
     <Link href={href} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${active ? "bg-[#eef3ff] text-[#3f76ff] font-medium" : "text-[#5e6574] hover:bg-[#f1f3f8]"}`}>
-      <span className="text-base">{icon}</span>
+      <span className="shrink-0">{icon}</span>
       <span className="flex-1">{label}</span>
       {!!badge && badge > 0 && (
         <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">{badge > 99 ? "99+" : badge}</span>

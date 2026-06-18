@@ -3,7 +3,7 @@ import { getAdmin } from "@/lib/supabase";
 import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { deriveIdentifier } from "@/lib/tasks";
-import { ensureUniqueIdentifier } from "@/lib/access";
+import { ensureUniqueIdentifier, getWorkspaceAccess } from "@/lib/access";
 
 const DEF_STATES = [
   { group: "backlog", name: "Backlog", color: "#a3a3a3", seq: 15000 },
@@ -13,13 +13,19 @@ const DEF_STATES = [
   { group: "cancelled", name: "Cancelled", color: "#dc2626", seq: 75000 },
 ];
 
+// Managers see every project in the workspace. Plain members only see the
+// projects they've been explicitly added to (project_members).
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
-  const { data: ws } = await getAdmin().from("workspaces").select("id").eq("slug", params.slug).single();
-  if (!ws) return err("Workspace not found", 404);
-  const { data } = await getAdmin().from("projects").select("*").eq("workspace_id", ws.id).order("created_at", { ascending: false });
-  return ok(data || []);
+  const access = await getWorkspaceAccess(params.slug, user.id);
+  if (!access) return err("Access denied", 403);
+  const wsId = access.workspace.id;
+  const { data } = await getAdmin().from("projects").select("*").eq("workspace_id", wsId).order("created_at", { ascending: false });
+  if (access.isManager) return ok(data || []);
+  const { data: pm } = await getAdmin().from("project_members").select("project_id").eq("user_id", user.id);
+  const allowed = new Set((pm || []).map((p: any) => p.project_id));
+  return ok((data || []).filter((p: any) => allowed.has(p.id)));
 }
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {

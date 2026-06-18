@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { PinIcon, BugIcon, EyeIcon, BellIcon, CheckCircleIcon } from "@/components/icons";
+import type { ReactNode } from "react";
 
 interface Notif {
   id: string; kind: string; read_at: string | null; created_at: string;
@@ -10,10 +12,10 @@ interface Notif {
   workspace_slug: string | null; actor_name: string;
 }
 
-const KIND_META: Record<string, { icon: string; verb: string }> = {
-  assigned: { icon: "📌", verb: "assigned you a task" },
-  bug: { icon: "🐞", verb: "assigned you a bug" },
-  review_request: { icon: "👀", verb: "requested your review" },
+const KIND_META: Record<string, { icon: ReactNode; verb: string }> = {
+  assigned: { icon: <PinIcon />, verb: "assigned you a task" },
+  bug: { icon: <BugIcon size={16} />, verb: "assigned you a bug" },
+  review_request: { icon: <EyeIcon />, verb: "requested your review" },
 };
 
 export default function NotificationsPage() {
@@ -43,14 +45,14 @@ export default function NotificationsPage() {
       {loading ? (
         <div className="text-center py-12 text-[#9ca3af] text-sm">Loading...</div>
       ) : items.length === 0 ? (
-        <div className="text-center py-12 text-[#9ca3af] text-sm">You&apos;re all caught up. 🎉</div>
+        <div className="flex flex-col items-center gap-2 py-12 text-[#9ca3af] text-sm"><CheckCircleIcon className="text-[#16a34a]" /> You&apos;re all caught up.</div>
       ) : (
         <div className="bg-white rounded-xl border border-[#eef0f6] divide-y divide-[#f1f3f8]">
           {items.map((n) => {
-            const meta = KIND_META[n.kind] || { icon: "🔔", verb: n.kind };
+            const meta = KIND_META[n.kind] || { icon: <BellIcon size={16} />, verb: n.kind };
             return (
               <Link key={n.id} href={linkFor(n)} className={`flex items-start gap-3 px-4 py-3 hover:bg-[#f8f9fc] ${!n.read_at ? "bg-[#eef3ff]/40" : ""}`}>
-                <span className="text-base mt-0.5">{meta.icon}</span>
+                <span className="mt-0.5 text-[#5e6574]">{meta.icon}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-[#1a1d23]"><span className="font-medium">{n.actor_name}</span> {meta.verb}: <span className="font-medium">{n.issue_name}</span></p>
                   <p className="text-[10px] text-[#9ca3af]">{new Date(n.created_at).toLocaleString()}</p>

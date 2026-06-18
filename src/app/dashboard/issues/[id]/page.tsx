@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { BugIcon, CheckIcon, CloseIcon } from "@/components/icons";
 
 interface Issue { id: string; name: string; description_html: string; priority: string; sequence_id: number; state_id: string; assignee_id: string | null; is_bug: boolean; start_date: string | null; target_date: string | null; created_at: string; state: { id: string; name: string; group_name: string; color: string } | null; assignees: { user_id?: string; display_name?: string }[]; tag_ids: string[]; }
 interface State { id: string; name: string; group_name: string; color: string; }
@@ -153,13 +154,13 @@ export default function IssueDetailPage() {
             <input type="date" value={editTargetDate} onChange={(e) => setEditTargetDate(e.target.value)} className="w-full rounded-lg border border-[#e2e6ef] px-3 py-2 text-sm outline-none" />
           </div>
           <label className="flex items-center gap-2 mt-6 text-sm text-[#5e6574] cursor-pointer">
-            <input type="checkbox" checked={editBug} onChange={(e) => setEditBug(e.target.checked)} /> 🐞 Mark as bug
+            <input type="checkbox" checked={editBug} onChange={(e) => setEditBug(e.target.checked)} /> <BugIcon /> Mark as bug
           </label>
         </div>
         <div className="flex gap-4 text-xs text-[#9ca3af] pt-2 border-t border-[#eef0f6]">
           <span>#{issue.sequence_id}</span>
           <span>Created {new Date(issue.created_at).toLocaleDateString()}</span>
-          {issue.state?.group_name === "completed" && <span className="text-[#16a34a]">✓ Completed</span>}
+          {issue.state?.group_name === "completed" && <span className="flex items-center gap-1 text-[#16a34a]"><CheckIcon /> Completed</span>}
         </div>
         <div className="flex justify-between pt-2">
           <button onClick={deleteIssue} className="rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-50">Delete</button>
@@ -219,7 +220,7 @@ export default function IssueDetailPage() {
             <div key={s.id} className="flex items-center gap-2 text-sm group">
               <input type="checkbox" checked={s.done} onChange={() => toggleSub(s)} />
               <span className={`flex-1 ${s.done ? "line-through text-[#9ca3af]" : "text-[#1a1d23]"}`}>{s.title}</span>
-              <button onClick={() => deleteSub(s.id)} className="text-xs text-[#9ca3af] opacity-0 group-hover:opacity-100 hover:text-red-500">✕</button>
+              <button onClick={() => deleteSub(s.id)} className="text-[#9ca3af] opacity-0 group-hover:opacity-100 hover:text-red-500"><CloseIcon /></button>
             </div>
           ))}
         </div>
