@@ -90,6 +90,16 @@ export function tallyActivity(kinds: string[]): ActivitySummary {
   return c;
 }
 
+/** Derive a short project identifier from its name: multi-word → initials,
+ *  single word → first 3 letters. Caller ensures workspace-uniqueness. */
+export function deriveIdentifier(name: string): string {
+  const cleaned = (name || "").toUpperCase().replace(/[^A-Z0-9 ]/g, " ").trim();
+  if (!cleaned) return "PRJ";
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return words.slice(0, 4).map((w) => w[0]).join("");
+  return words[0].slice(0, 3);
+}
+
 /** Notification kind for an assignment — bugs get their own kind/styling. */
 export function assignmentNotificationKind(isBug: boolean): "bug" | "assigned" {
   return isBug ? "bug" : "assigned";

@@ -1,5 +1,5 @@
 import { getAdmin } from "./supabase";
-import { isManager } from "./tasks";
+import { isManager, deriveIdentifier } from "./tasks";
 
 export interface WorkspaceAccess {
   workspace: { id: string; slug: string; owner_id: string };
@@ -39,10 +39,22 @@ const DEFAULT_STATES = [
   { group: "cancelled", name: "Cancelled", color: "#dc2626", seq: 75000 },
 ];
 
-/** Create a project with the standard states and the creator as a project member. */
-export async function createDefaultProject(workspaceId: string, userId: string, name: string, identifier: string) {
+/** Pick a workspace-unique project identifier from a base code (appends 2,3,… on clash). */
+export async function ensureUniqueIdentifier(workspaceId: string, base: string): Promise<string> {
+  const code = base.toUpperCase();
+  const { data } = await getAdmin().from("projects").select("identifier").eq("workspace_id", workspaceId);
+  const taken = new Set((data || []).map((p: any) => (p.identifier || "").toUpperCase()));
+  if (!taken.has(code)) return code;
+  for (let i = 2; i < 100; i++) if (!taken.has(`${code}${i}`)) return `${code}${i}`;
+  return `${code}${Date.now() % 1000}`;
+}
+
+/** Create a project with the standard states and the creator as a project member.
+ *  Identifier is auto-derived from the name (and made unique) when not supplied. */
+export async function createDefaultProject(workspaceId: string, userId: string, name: string, identifier?: string) {
+  const code = await ensureUniqueIdentifier(workspaceId, identifier?.trim() || deriveIdentifier(name));
   const { data: proj } = await getAdmin().from("projects")
-    .insert({ name, identifier: identifier.toUpperCase(), workspace_id: workspaceId }).select().single();
+    .insert({ name, identifier: code, workspace_id: workspaceId }).select().single();
   if (!proj) return null;
   for (const s of DEFAULT_STATES) {
     await getAdmin().from("states").insert({ project_id: proj.id, workspace_id: workspaceId, name: s.name, color: s.color, group_name: s.group, sequence: s.seq, is_default: s.group === "unstarted" });

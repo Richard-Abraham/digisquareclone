@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { deriveIdentifier } from "@/lib/tasks";
 
 interface Issue { id: string; name: string; priority: string; sequence_id: number; is_bug?: boolean; subtask_total?: number; subtask_done?: number; state: { name: string; group_name: string; color: string } | null; assignee: { display_name: string } | null; created_at: string; target_date: string | null; }
 interface State { id: string; name: string; group_name: string; color: string; }
@@ -30,7 +31,6 @@ export default function IssuesPage() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [showProj, setShowProj] = useState(false);
   const [newProjName, setNewProjName] = useState("");
-  const [newProjId, setNewProjId] = useState("");
   const router = useRouter();
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -71,13 +71,13 @@ export default function IssuesPage() {
   }
 
   async function createProject() {
-    if (!newProjName.trim() || !newProjId.trim()) return;
+    if (!newProjName.trim()) return;
     const res = await fetch(`/api/workspaces/${wsSlug}/projects`, {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name: newProjName, identifier: newProjId }),
+      body: JSON.stringify({ name: newProjName }),
     });
     const json = await res.json();
-    if (json.success) { setProjects(p => [json.data, ...p]); setShowProj(false); setNewProjName(""); setNewProjId(""); selectProject(json.data.id); }
+    if (json.success) { setProjects(p => [json.data, ...p]); setShowProj(false); setNewProjName(""); selectProject(json.data.id); }
   }
 
   async function loadIssues(slug?: string, pid?: string) {
@@ -142,8 +142,8 @@ export default function IssuesPage() {
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg" onClick={e => e.stopPropagation()}>
             <h2 className="font-semibold mb-4">New Project</h2>
             <div className="space-y-3">
-              <input value={newProjName} onChange={e => setNewProjName(e.target.value)} placeholder="Project name" className="w-full rounded-lg border border-[#e2e6ef] px-3 py-2 text-sm outline-none focus:border-[#3f76ff]" autoFocus />
-              <input value={newProjId} onChange={e => setNewProjId(e.target.value.toUpperCase())} placeholder="Identifier (e.g. ENG)" maxLength={6} className="w-full rounded-lg border border-[#e2e6ef] px-3 py-2 text-sm outline-none focus:border-[#3f76ff]" />
+              <input value={newProjName} onChange={e => setNewProjName(e.target.value)} onKeyDown={e => e.key === "Enter" && createProject()} placeholder="Project name" className="w-full rounded-lg border border-[#e2e6ef] px-3 py-2 text-sm outline-none focus:border-[#3f76ff]" autoFocus />
+              <p className="text-xs text-[#9ca3af]">A short code (<span className="font-mono">{deriveIdentifier(newProjName.trim() || "General")}</span>) is generated automatically.</p>
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setShowProj(false)} className="rounded-lg px-3 py-2 text-sm text-[#5e6574] hover:bg-[#f1f3f8]">Cancel</button>

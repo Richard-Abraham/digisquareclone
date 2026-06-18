@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { getAdmin } from "@/lib/supabase";
 import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
+import { deriveIdentifier } from "@/lib/tasks";
+import { ensureUniqueIdentifier } from "@/lib/access";
 
 const DEF_STATES = [
   { group: "backlog", name: "Backlog", color: "#a3a3a3", seq: 15000 },
@@ -26,8 +28,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const { data: ws } = await getAdmin().from("workspaces").select("id").eq("slug", params.slug).single();
   if (!ws) return err("Workspace not found", 404);
   const { name, identifier } = await req.json() as { name?: string; identifier?: string };
-  if (!name || !identifier) return err("Name and identifier required");
-  const { data: proj, error: pe } = await getAdmin().from("projects").insert({ name, identifier: identifier.toUpperCase(), workspace_id: ws.id }).select().single();
+  if (!name?.trim()) return err("Name required");
+  // Identifier is optional now — auto-derive from the name and make it workspace-unique.
+  const code = await ensureUniqueIdentifier(ws.id, identifier?.trim() || deriveIdentifier(name));
+  const { data: proj, error: pe } = await getAdmin().from("projects").insert({ name, identifier: code, workspace_id: ws.id }).select().single();
   if (pe) return err(pe.message, 400);
   for (const s of DEF_STATES) await getAdmin().from("states").insert({ project_id: proj.id, workspace_id: ws.id, name: s.name, color: s.color, group_name: s.group, sequence: s.seq, is_default: s.group === "unstarted" });
   await getAdmin().from("project_members").insert({ project_id: proj.id, user_id: user.id, role: 10 });

@@ -3,7 +3,7 @@ import {
   isCompletedGroup, reviewerTransitions, isManager,
   todayKey, dateToKey, keyToDate, tallyActivity, subtaskProgress,
   isAssignableRole, roleLabel, MEMBER_ROLE, MANAGER_ROLE,
-  assignmentNotificationKind,
+  assignmentNotificationKind, deriveIdentifier,
 } from "./tasks";
 
 describe("isCompletedGroup", () => {
@@ -85,6 +85,21 @@ describe("assignmentNotificationKind", () => {
   it("bugs notify as 'bug', everything else as 'assigned'", () => {
     expect(assignmentNotificationKind(true)).toBe("bug");
     expect(assignmentNotificationKind(false)).toBe("assigned");
+  });
+});
+
+describe("deriveIdentifier", () => {
+  it("single word → first 3 letters", () => {
+    expect(deriveIdentifier("General")).toBe("GEN");
+    expect(deriveIdentifier("go")).toBe("GO");
+  });
+  it("multi-word → initials (max 4)", () => {
+    expect(deriveIdentifier("Marketing Site")).toBe("MS");
+    expect(deriveIdentifier("Eng Ops Team Beta X")).toBe("EOTB");
+  });
+  it("strips punctuation and falls back", () => {
+    expect(deriveIdentifier("a-b c")).toBe("ABC");
+    expect(deriveIdentifier("   ")).toBe("PRJ");
   });
 });
 
