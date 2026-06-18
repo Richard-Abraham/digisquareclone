@@ -4,12 +4,13 @@ import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { writeActivity } from "@/lib/activity";
 import { writeNotifications } from "@/lib/notifications";
-import { ensureProjectMembers } from "@/lib/access";
+import { ensureProjectMembers, getProjectAccess } from "@/lib/access";
 import type { ReviewerState } from "@/lib/tasks";
 
-export async function GET(req: NextRequest, { params }: { params: { issueId: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { projectId: string; issueId: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
+  if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
   const { data } = await getAdmin().from("issue_reviewers").select("*").eq("issue_id", params.issueId);
   const ids = (data || []).map((r: any) => r.user_id);
   const { data: profiles } = ids.length ? await getAdmin().from("profiles").select("*").in("user_id", ids) : { data: [] };
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: { issueId: str
 export async function POST(req: NextRequest, { params }: { params: { projectId: string; issueId: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
+  if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
   const { user_ids } = await req.json() as { user_ids?: string[] };
   const ids = Array.from(new Set(user_ids || []));
   if (!ids.length) return ok({ added: 0 });
@@ -41,6 +43,7 @@ export async function POST(req: NextRequest, { params }: { params: { projectId: 
 export async function PATCH(req: NextRequest, { params }: { params: { projectId: string; issueId: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
+  if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
   const body = await req.json() as { state?: ReviewerState; comment?: string; user_id?: string };
   const state = body.state;
   if (!state || !["pending", "approved", "changes_requested", "declined"].includes(state)) return err("Invalid state");
@@ -60,9 +63,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { projectId:
   return ok({ ok: true });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { issueId: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { projectId: string; issueId: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
+  if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
   const url = new URL(req.url);
   const userId = url.searchParams.get("user_id");
   if (!userId) return err("user_id required");

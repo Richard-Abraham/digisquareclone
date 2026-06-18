@@ -4,7 +4,7 @@ import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { writeActivity } from "@/lib/activity";
 import { writeNotifications } from "@/lib/notifications";
-import { ensureProjectMembers } from "@/lib/access";
+import { ensureProjectMembers, getProjectAccess } from "@/lib/access";
 import { assignmentNotificationKind } from "@/lib/tasks";
 
 // Replace the full set of assignees on an issue. Keeps issues.assignee_id (the
@@ -12,6 +12,7 @@ import { assignmentNotificationKind } from "@/lib/tasks";
 export async function PUT(req: NextRequest, { params }: { params: { slug: string; projectId: string; issueId: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
+  if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
   const { user_ids } = await req.json() as { user_ids?: string[] };
   const ids = Array.from(new Set(user_ids || []));
 
