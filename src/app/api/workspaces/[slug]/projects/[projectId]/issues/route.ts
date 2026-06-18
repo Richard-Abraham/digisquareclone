@@ -3,6 +3,7 @@ import { getAdmin } from "@/lib/supabase";
 import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { writeActivity } from "@/lib/activity";
+import { ensureProjectMembers } from "@/lib/access";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string; projectId: string } }) {
   const user = await getUser(req);
@@ -86,6 +87,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (assigneeIds.length) await getAdmin().from("issue_assignees").insert(assigneeIds.map((uid) => ({ issue_id: issue.id, user_id: uid })));
   if (reviewerIds.length) await getAdmin().from("issue_reviewers").insert(reviewerIds.map((uid) => ({ issue_id: issue.id, user_id: uid, state: "pending" })));
   if (tagIds.length) await getAdmin().from("issue_tags").insert(tagIds.map((tid) => ({ issue_id: issue.id, tag_id: tid })));
+
+  // Assigning/reviewing grants project access; the creator is always a member too.
+  await ensureProjectMembers(params.projectId, [user.id, ...assigneeIds, ...reviewerIds]);
 
   await writeActivity({
     workspaceId: project.workspace_id, actorId: user.id, kind: body.is_bug ? "bugged" : "created",

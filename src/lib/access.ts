@@ -31,6 +31,37 @@ export async function getIssueContext(issueId: string, userId: string): Promise<
   return { issue, access: { workspace: ws, role: m?.role ?? null, isManager: isManager({ isOwner, role: m?.role ?? null }) } };
 }
 
+const DEFAULT_STATES = [
+  { group: "backlog", name: "Backlog", color: "#a3a3a3", seq: 15000 },
+  { group: "unstarted", name: "Todo", color: "#3f76ff", seq: 30000 },
+  { group: "started", name: "In Progress", color: "#f59e0b", seq: 45000 },
+  { group: "completed", name: "Done", color: "#16a34a", seq: 60000 },
+  { group: "cancelled", name: "Cancelled", color: "#dc2626", seq: 75000 },
+];
+
+/** Create a project with the standard states and the creator as a project member. */
+export async function createDefaultProject(workspaceId: string, userId: string, name: string, identifier: string) {
+  const { data: proj } = await getAdmin().from("projects")
+    .insert({ name, identifier: identifier.toUpperCase(), workspace_id: workspaceId }).select().single();
+  if (!proj) return null;
+  for (const s of DEFAULT_STATES) {
+    await getAdmin().from("states").insert({ project_id: proj.id, workspace_id: workspaceId, name: s.name, color: s.color, group_name: s.group, sequence: s.seq, is_default: s.group === "unstarted" });
+  }
+  await getAdmin().from("project_members").insert({ project_id: proj.id, user_id: userId, role: 10 });
+  return proj;
+}
+
+/** Grant project access to users (e.g. when assigning them a task). Inserts only the
+ *  ones not already members, so it works without relying on a unique constraint. */
+export async function ensureProjectMembers(projectId: string, userIds: string[]) {
+  const ids = Array.from(new Set(userIds.filter(Boolean)));
+  if (!ids.length) return;
+  const { data: existing } = await getAdmin().from("project_members").select("user_id").eq("project_id", projectId).in("user_id", ids);
+  const have = new Set((existing || []).map((m: any) => m.user_id));
+  const missing = ids.filter((id) => !have.has(id));
+  if (missing.length) await getAdmin().from("project_members").insert(missing.map((user_id) => ({ project_id: projectId, user_id, role: 10 })));
+}
+
 /** Find the default completed-group state for a project (used to mark issues done). */
 export async function getCompletedState(projectId: string): Promise<string | null> {
   const { data } = await getAdmin().from("states").select("id, is_default").eq("project_id", projectId).eq("group_name", "completed").order("sequence");

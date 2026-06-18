@@ -9,21 +9,25 @@ interface Profile { display_name: string; avatar?: string; }
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [ready, setReady] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const parts = pathname.split("/").filter(Boolean);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) { router.push("/login"); return; }
-    fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).then(json => {
+    const headers = { Authorization: `Bearer ${token}` };
+    fetch("/api/auth/me", { headers }).then(r => r.json()).then(async json => {
       if (!json.success) { localStorage.removeItem("token"); router.push("/login"); return; }
       setUser(json.data.user);
       setProfile(json.data.profile);
+      // Ensure the user has a workspace + project before any page loads.
+      await fetch("/api/bootstrap", { method: "POST", headers }).catch(() => {});
+      setReady(true);
     });
   }, [router]);
 
-  if (!user) return <div className="flex h-screen items-center justify-center text-[#5e6574]">Loading...</div>;
+  if (!user || !ready) return <div className="flex h-screen items-center justify-center text-[#5e6574]">Loading...</div>;
 
   return (
     <div className="flex h-screen overflow-hidden">

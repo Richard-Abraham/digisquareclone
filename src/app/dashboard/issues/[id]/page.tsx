@@ -47,15 +47,15 @@ export default function IssueDetailPage() {
   const [newComment, setNewComment] = useState("");
 
   const loadData = useCallback(async () => {
-    const [iss, st, mem, tg, sub, com, rev, act, meRes] = await Promise.all([
+    const [iss, st, memRes, tg, sub, com, rev, act, meRes] = await Promise.all([
       api<Issue>(base), api<State[]>(`/api/workspaces/${wsSlug}/projects/${projId}/states`),
-      api<Member[]>(`/api/workspaces/${wsSlug}/projects/${projId}/members`),
+      api<{ members: { user_id: string; profile: { display_name: string } | null }[] }>(`/api/workspaces/${wsSlug}/members`),
       api<Tag[]>(`/api/workspaces/${wsSlug}/tags`),
       api<SubTask[]>(`${base}/subtasks`), api<Comment[]>(`${base}/comments`),
       api<Reviewer[]>(`${base}/reviewers`), api<ActivityEvent[]>(`${base}/activity`),
       api<{ user: { id: string } }>("/api/auth/me"),
     ]);
-    setIssue(iss); setStates(st); setMembers(mem); setTags(tg); setSubtasks(sub); setComments(com); setReviewers(rev); setActivity(act);
+    setIssue(iss); setStates(st); setMembers((memRes.members || []).map((m) => ({ user_id: m.user_id, profile: m.profile }))); setTags(tg); setSubtasks(sub); setComments(com); setReviewers(rev); setActivity(act);
     setMe(meRes.user.id);
     setEditName(iss.name); setEditState(iss.state_id || ""); setEditPriority(iss.priority);
     setEditTargetDate(iss.target_date || ""); setEditBug(iss.is_bug);

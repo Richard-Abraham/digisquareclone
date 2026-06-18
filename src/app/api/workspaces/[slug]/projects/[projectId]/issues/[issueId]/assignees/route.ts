@@ -3,6 +3,7 @@ import { getAdmin } from "@/lib/supabase";
 import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { writeActivity } from "@/lib/activity";
+import { ensureProjectMembers } from "@/lib/access";
 
 // Replace the full set of assignees on an issue. Keeps issues.assignee_id (the
 // "primary") in sync with the first id so existing single-assignee views keep working.
@@ -18,6 +19,7 @@ export async function PUT(req: NextRequest, { params }: { params: { slug: string
   await getAdmin().from("issue_assignees").delete().eq("issue_id", params.issueId);
   if (ids.length) await getAdmin().from("issue_assignees").insert(ids.map((uid) => ({ issue_id: params.issueId, user_id: uid })));
   await getAdmin().from("issues").update({ assignee_id: ids[0] || null, updated_by: user.id }).eq("id", params.issueId);
+  await ensureProjectMembers(params.projectId, ids);
 
   if (ids.length) {
     await writeActivity({ workspaceId: issue.workspace_id, actorId: user.id, kind: "assigned", targetType: "issue", issueId: params.issueId, projectId: params.projectId });

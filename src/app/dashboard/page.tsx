@@ -27,6 +27,10 @@ export default function IssuesPage() {
   const [newBug, setNewBug] = useState(false);
   const [wsSlug, setWsSlug] = useState("");
   const [projId, setProjId] = useState("");
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [showProj, setShowProj] = useState(false);
+  const [newProjName, setNewProjName] = useState("");
+  const [newProjId, setNewProjId] = useState("");
   const router = useRouter();
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -47,19 +51,33 @@ export default function IssuesPage() {
     const projRes = await fetch(`/api/workspaces/${slug}/projects`, { headers: { Authorization: `Bearer ${token}` } });
     const projJson = await projRes.json();
     if (!projJson.success || !projJson.data.length) { setLoading(false); return; }
+    setProjects(projJson.data);
     const pid = projJson.data[0].id;
-    setProjId(pid);
 
-    const [stateRes, memberRes] = await Promise.all([
-      fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`/api/workspaces/${slug}/projects/${pid}/members`, { headers: { Authorization: `Bearer ${token}` } }),
-    ]);
-    const sJson = await stateRes.json();
+    // Assignable people = workspace members (manage them on the Members page).
+    const memberRes = await fetch(`/api/workspaces/${slug}/members`, { headers: { Authorization: `Bearer ${token}` } });
     const mJson = await memberRes.json();
-    if (sJson.success) setStates(sJson.data);
-    if (mJson.success) setMembers(mJson.data);
+    if (mJson.success) setMembers((mJson.data.members || []).map((m: any) => ({ user_id: m.user_id, profile: m.profile })));
 
+    await selectProject(pid, slug);
+  }
+
+  async function selectProject(pid: string, slug = wsSlug) {
+    setProjId(pid);
+    const sRes = await fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { headers: { Authorization: `Bearer ${token}` } });
+    const sJson = await sRes.json();
+    if (sJson.success) setStates(sJson.data);
     await loadIssues(slug, pid);
+  }
+
+  async function createProject() {
+    if (!newProjName.trim() || !newProjId.trim()) return;
+    const res = await fetch(`/api/workspaces/${wsSlug}/projects`, {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name: newProjName, identifier: newProjId }),
+    });
+    const json = await res.json();
+    if (json.success) { setProjects(p => [json.data, ...p]); setShowProj(false); setNewProjName(""); setNewProjId(""); selectProject(json.data.id); }
   }
 
   async function loadIssues(slug?: string, pid?: string) {
@@ -104,12 +122,36 @@ export default function IssuesPage() {
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div>
+        <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-[#1a1d23]">Tasks</h1>
-          <p className="text-sm text-[#5e6574]">{total} total</p>
+          {projects.length > 0 && (
+            <select value={projId} onChange={e => selectProject(e.target.value)} className="rounded-lg border border-[#e2e6ef] px-2 py-1 text-sm outline-none bg-white">
+              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          )}
+          <span className="text-sm text-[#5e6574]">{total} total</span>
         </div>
-        <button onClick={() => setShowCreate(true)} className="rounded-lg bg-[#3f76ff] px-4 py-2 text-sm font-medium text-white hover:bg-[#2558e8]">+ New Task</button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowProj(true)} className="rounded-lg border border-[#e2e6ef] px-3 py-2 text-sm text-[#5e6574] hover:bg-[#f1f3f8]">+ Project</button>
+          <button onClick={() => setShowCreate(true)} className="rounded-lg bg-[#3f76ff] px-4 py-2 text-sm font-medium text-white hover:bg-[#2558e8]">+ New Task</button>
+        </div>
       </div>
+
+      {showProj && (
+        <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center" onClick={() => setShowProj(false)}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-lg" onClick={e => e.stopPropagation()}>
+            <h2 className="font-semibold mb-4">New Project</h2>
+            <div className="space-y-3">
+              <input value={newProjName} onChange={e => setNewProjName(e.target.value)} placeholder="Project name" className="w-full rounded-lg border border-[#e2e6ef] px-3 py-2 text-sm outline-none focus:border-[#3f76ff]" autoFocus />
+              <input value={newProjId} onChange={e => setNewProjId(e.target.value.toUpperCase())} placeholder="Identifier (e.g. ENG)" maxLength={6} className="w-full rounded-lg border border-[#e2e6ef] px-3 py-2 text-sm outline-none focus:border-[#3f76ff]" />
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setShowProj(false)} className="rounded-lg px-3 py-2 text-sm text-[#5e6574] hover:bg-[#f1f3f8]">Cancel</button>
+              <button onClick={createProject} className="rounded-lg bg-[#3f76ff] px-4 py-2 text-sm font-medium text-white">Create</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create modal */}
       {showCreate && (
