@@ -47,6 +47,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => clearInterval(t);
   }, [ready, pathname]);
 
+  // Pick up profile edits (display name) made on /dashboard/profile when navigating back.
+  useEffect(() => {
+    if (!ready) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(j => { if (j.success) setProfile(j.data.profile); }).catch(() => {});
+  }, [ready, pathname]);
+
   if (!user || !ready) return <div className="flex h-screen items-center justify-center text-[#5e6574]">Loading...</div>;
 
   return (
@@ -68,11 +77,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
         <div className="border-t border-[#eef0f6] p-3">
           <div className="flex items-center gap-2">
-            <div className="size-7 rounded-full bg-[#e8ecf4] flex items-center justify-center text-xs font-medium text-[#5e6574]">{profile?.display_name?.[0]?.toUpperCase() || "U"}</div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-[#1a1d23] truncate">{profile?.display_name || user.email}</p>
-              <p className="text-[10px] text-[#9ca3af] truncate">{user.email}</p>
-            </div>
+            <Link href="/dashboard/profile" className="flex items-center gap-2 flex-1 min-w-0 hover:opacity-80">
+              <div className="size-7 rounded-full bg-[#e8ecf4] flex items-center justify-center text-xs font-medium text-[#5e6574]">{profile?.display_name?.[0]?.toUpperCase() || "U"}</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-[#1a1d23] truncate">{profile?.display_name || user.email}</p>
+                <p className="text-[10px] text-[#9ca3af] truncate">{user.email}</p>
+              </div>
+            </Link>
             <button onClick={() => { localStorage.removeItem("token"); router.push("/login"); }} className="text-xs text-[#9ca3af] hover:text-red-500">Logout</button>
           </div>
         </div>

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { deriveIdentifier } from "@/lib/tasks";
 import { BugIcon } from "@/components/icons";
 
-interface Issue { id: string; name: string; priority: string; sequence_id: number; is_bug?: boolean; subtask_total?: number; subtask_done?: number; state: { name: string; group_name: string; color: string } | null; assignee: { display_name: string } | null; created_at: string; target_date: string | null; }
+interface Issue { id: string; name: string; priority: string; sequence_id: number; is_bug?: boolean; subtask_total?: number; subtask_done?: number; state: { name: string; group_name: string; color: string } | null; assignee: { display_name: string } | null; assignees: { user_id?: string; display_name?: string }[]; created_at: string; target_date: string | null; }
 interface State { id: string; name: string; group_name: string; color: string; }
 interface Member { user_id: string; profile: { display_name: string } | null; }
 
@@ -24,7 +24,7 @@ export default function IssuesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newPriority, setNewPriority] = useState("none");
-  const [newAssignee, setNewAssignee] = useState("");
+  const [newAssigneeIds, setNewAssigneeIds] = useState<string[]>([]);
   const [newBug, setNewBug] = useState(false);
   const [wsSlug, setWsSlug] = useState("");
   const [projId, setProjId] = useState("");
@@ -108,10 +108,14 @@ export default function IssuesPage() {
     if (!newName.trim()) return;
     const res = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues`, {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ name: newName, priority: newPriority, assignee_ids: newAssignee ? [newAssignee] : [], is_bug: newBug }),
+      body: JSON.stringify({ name: newName, priority: newPriority, assignee_ids: newAssigneeIds, is_bug: newBug }),
     });
     const json = await res.json();
-    if (json.success) { setNewName(""); setNewBug(false); setShowCreate(false); loadIssues(); }
+    if (json.success) { setNewName(""); setNewBug(false); setNewAssigneeIds([]); setShowCreate(false); loadIssues(); }
+  }
+
+  function toggleNewAssignee(uid: string) {
+    setNewAssigneeIds((cur) => cur.includes(uid) ? cur.filter((x) => x !== uid) : [...cur, uid]);
   }
 
   const groupByState = (state: string) => {
@@ -194,10 +198,21 @@ export default function IssuesPage() {
               <select value={newPriority} onChange={e => setNewPriority(e.target.value)} className="w-full rounded-lg border border-[#e2e6ef] px-3 py-2 text-sm outline-none">
                 {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
               </select>
-              <select value={newAssignee} onChange={e => setNewAssignee(e.target.value)} className="w-full rounded-lg border border-[#e2e6ef] px-3 py-2 text-sm outline-none">
-                <option value="">Unassigned</option>
-                {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profile?.display_name || m.user_id.slice(0, 8)}</option>)}
-              </select>
+              <div>
+                <p className="text-xs font-medium text-[#5e6574] mb-1.5">Assignees</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {members.length === 0 && <p className="text-xs text-[#9ca3af]">No members yet.</p>}
+                  {members.map(m => {
+                    const on = newAssigneeIds.includes(m.user_id);
+                    return (
+                      <button key={m.user_id} type="button" onClick={() => toggleNewAssignee(m.user_id)}
+                        className={`text-xs px-2 py-1 rounded-full border ${on ? "bg-[#eef3ff] border-[#3f76ff] text-[#3f76ff]" : "border-[#e2e6ef] text-[#5e6574] hover:bg-[#f1f3f8]"}`}>
+                        {m.profile?.display_name || m.user_id.slice(0, 6)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <label className="flex items-center gap-2 text-sm text-[#5e6574] cursor-pointer">
                 <input type="checkbox" checked={newBug} onChange={e => setNewBug(e.target.checked)} /> <BugIcon /> This is a bug
               </label>
@@ -258,7 +273,11 @@ export default function IssuesPage() {
                       <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: PRIO_COLORS[issue.priority] + "20", color: PRIO_COLORS[issue.priority] }}>{issue.priority}</span>
                       <div className="flex items-center gap-1.5">
                         {!!issue.subtask_total && <span className="text-[10px] text-[#9ca3af]">{issue.subtask_done}/{issue.subtask_total}</span>}
-                        {issue.assignee && <span className="text-[10px] text-[#9ca3af]">{issue.assignee.display_name}</span>}
+                        {issue.assignees?.length > 0 && (
+                          <span className="text-[10px] text-[#9ca3af]">
+                            {issue.assignees[0].display_name || "User"}{issue.assignees.length > 1 && ` +${issue.assignees.length - 1}`}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
