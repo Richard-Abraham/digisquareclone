@@ -27,7 +27,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   // Gather all unique user IDs across all relations for a single profiles fetch
   const allUserIds = Array.from(new Set([
-    issue.assignee_id,
+    issue.assignee_id, issue.created_by,
     ...(issue.assignees || []).map((a: any) => a.user_id),
     ...(commentsRes.data || []).map((c: any) => c.author_id),
     ...(reviewersRes.data || []).map((r: any) => r.user_id),

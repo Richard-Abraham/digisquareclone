@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/providers";
 import { deriveIdentifier } from "@/lib/tasks";
 import { BugIcon } from "@/components/icons";
+import IssuePanel from "./issue-panel";
 
-interface Issue { id: string; name: string; priority: string; sequence_id: number; is_bug?: boolean; subtask_total?: number; subtask_done?: number; state: { name: string; group_name: string; color: string } | null; assignee: { display_name: string } | null; assignees: { user_id?: string; display_name?: string }[]; created_at: string; target_date: string | null; }
+interface Issue { id: string; name: string; priority: string; sequence_id: number; is_bug?: boolean; subtask_total?: number; subtask_done?: number; state: { id: string; name: string; group_name: string; color: string } | null; assignee: { display_name: string } | null; assignees: { user_id?: string; display_name?: string }[]; created_at: string; target_date: string | null; creator?: { display_name?: string } | null; }
 interface State { id: string; name: string; group_name: string; color: string; }
 interface Member { user_id: string; profile: { display_name: string } | null; }
 
@@ -44,6 +45,7 @@ export default function IssuesPage() {
   const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
   const [showProj, setShowProj] = useState(false);
   const [newProjName, setNewProjName] = useState("");
+  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const router = useRouter();
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -142,7 +144,7 @@ export default function IssuesPage() {
     const target = states.find(s => s.group_name === group);
     const issue = issues.find(i => i.id === issueId);
     if (!target || !issue || issue.state?.group_name === group) return;
-    setIssues(prev => prev.map(i => i.id === issueId ? { ...i, state: { name: target.name, group_name: target.group_name, color: target.color } } : i));
+    setIssues(prev => prev.map(i => i.id === issueId ? { ...i, state: { id: target.id, name: target.name, group_name: target.group_name, color: target.color } } : i));
     await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${issueId}`, {
       method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ state_id: target.id }),
@@ -235,7 +237,7 @@ export default function IssuesPage() {
                     <div key={issue.id} draggable
                       onDragStart={() => setDragId(issue.id)}
                       onDragEnd={() => { setDragId(null); setDragOverGroup(null); }}
-                      onClick={() => router.push(`/dashboard/issues/${issue.id}?ws=${wsSlug}&proj=${projId}`)}
+                      onClick={() => setSelectedIssue(issue.id)}
                       className={`card p-3 cursor-grab active:cursor-grabbing transition-all duration-150
                         hover:shadow-elevated hover:-translate-y-0.5
                         ${dragId === issue.id ? "opacity-50 ring-2 ring-primary-300" : ""}
@@ -380,6 +382,21 @@ export default function IssuesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Slide-over panel */}
+      {selectedIssue && (
+        <IssuePanel
+          issueId={selectedIssue}
+          wsSlug={wsSlug}
+          projId={projId}
+          members={members}
+          states={states}
+          onClose={() => setSelectedIssue(null)}
+          onIssueUpdated={(updated) => {
+            setIssues(prev => prev.map(i => i.id === updated.id ? { ...i, ...updated } : i));
+          }}
+        />
       )}
     </div>
   );

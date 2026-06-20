@@ -39,9 +39,9 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   let rows = data || [];
   if (tag) rows = rows.filter((i: any) => (i.tags || []).some((t: any) => t.tag_id === tag));
 
-  // Enrich assignees (multi) + primary assignee with profiles.
+  // Enrich assignees (multi) + primary assignee + creator with profiles.
   const userIds = Array.from(new Set(rows.flatMap((i: any) => [
-    i.assignee_id, ...(i.assignees || []).map((a: any) => a.user_id),
+    i.assignee_id, i.created_by, ...(i.assignees || []).map((a: any) => a.user_id),
   ]).filter(Boolean)));
   const { data: profiles } = userIds.length ? await getAdmin().from("profiles").select("*").in("user_id", userIds) : { data: [] };
   const pm = new Map((profiles || []).map((p: any) => [p.user_id, p]));
@@ -49,6 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     ...i,
     assignee: i.assignee_id ? pm.get(i.assignee_id) || null : null,
     assignees: (i.assignees || []).map((a: any) => pm.get(a.user_id) || { user_id: a.user_id }),
+    creator: i.created_by ? pm.get(i.created_by) || null : null,
     tag_ids: (i.tags || []).map((t: any) => t.tag_id),
     subtask_total: (i.subtasks || []).length,
     subtask_done: (i.subtasks || []).filter((s: any) => s.done).length,
