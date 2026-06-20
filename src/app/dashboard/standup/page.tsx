@@ -83,6 +83,7 @@ export default function StandupPage() {
   }
 
   async function saveReport(submit: boolean) {
+    if (submit && !report.trim()) return;
     setSavingReport(true);
     try {
       const completions = planIds.map((id) => ({ issue_id: id, completed: !!reportDone[id] }));
@@ -169,9 +170,9 @@ export default function StandupPage() {
                 )}
               </div>
               <textarea value={report} onChange={(e) => setReport(e.target.value)} disabled={submitted} rows={3}
-                placeholder="What did you accomplish?" className="input resize-none disabled:bg-surface-muted disabled:opacity-60" />
+                placeholder="Any challenges, blockers, or references..." className="input resize-none disabled:bg-surface-muted disabled:opacity-60" />
               {planTaskRefs.length > 0 && (
-                <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mt-4 mb-2">Mark completed</p>
+                <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider mt-4 mb-2">Mark completed <span className="text-text-tertiary font-normal normal-case">(checked tasks move to Done on the board)</span></p>
               )}
               <div className="space-y-1">
                 {planTaskRefs.map((t) => (
