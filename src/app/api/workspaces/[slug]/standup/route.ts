@@ -2,11 +2,11 @@ import { NextRequest } from "next/server";
 import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { getAdmin } from "@/lib/supabase";
-import { getWorkspaceAccess } from "@/lib/access";
+import { getWorkspaceAccess, canViewAllStandups } from "@/lib/access";
 import { todayKey } from "@/lib/tasks";
 import { toStandupData } from "@/lib/standup";
 
-// My standup for a given day (+ the whole team's if I'm a manager).
+// My standup for a given day (+ the whole team's if I'm the owner or a standup manager).
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
@@ -15,7 +15,9 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const dateKey = new URL(req.url).searchParams.get("date") || todayKey();
   const wsId = access.workspace.id;
 
-  if (!access.isManager) {
+  const canViewAll = await canViewAllStandups(wsId, user.id, access.workspace.owner_id);
+
+  if (!canViewAll) {
     const { data: mine } = await getAdmin().from("daily_standups").select("*").eq("workspace_id", wsId).eq("user_id", user.id).eq("date", dateKey).maybeSingle();
     const map = await toStandupData(mine ? [mine] : []);
     return ok({ my_standup: mine ? map.get(mine.id) : null, team_standups: [], is_manager: false });

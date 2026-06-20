@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { getAdmin } from "@/lib/supabase";
-import { getWorkspaceAccess } from "@/lib/access";
+import { getWorkspaceAccess, canViewAllStandups } from "@/lib/access";
 import { toStandupData } from "@/lib/standup";
 
 const PAGE_SIZE = 15;
@@ -16,7 +16,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   if (!access) return err("Access denied", 403);
   const url = new URL(req.url);
   const cursor = url.searchParams.get("cursor");
-  const targetUserId = access.isManager ? url.searchParams.get("userId") : user.id;
+  const canViewAll = await canViewAllStandups(access.workspace.id, user.id, access.workspace.owner_id);
+  const targetUserId = canViewAll ? url.searchParams.get("userId") : user.id;
   const wsId = access.workspace.id;
 
   let q = getAdmin().from("daily_standups").select("*").eq("workspace_id", wsId).not("submitted_at", "is", null).order("date", { ascending: false }).limit(PAGE_SIZE + 1);

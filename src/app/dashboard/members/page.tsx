@@ -6,6 +6,7 @@ import { ASSIGNABLE_ROLES, roleLabel } from "@/lib/tasks";
 
 interface Member { user_id: string; role: number; is_owner: boolean; profile: { display_name?: string } | null }
 interface Candidate { user_id: string; display_name: string }
+interface StandupManager { user_id: string; display_name: string | null; created_at: string }
 
 export default function MembersPage() {
   const router = useRouter();
@@ -19,6 +20,10 @@ export default function MembersPage() {
   const [addRole, setAddRole] = useState<number>(ASSIGNABLE_ROLES[0].value);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [standupManagers, setStandupManagers] = useState<StandupManager[]>([]);
+  const [isOwner, setIsOwner] = useState(false);
+  const [managerPick, setManagerPick] = useState("");
+  const [managerBusy, setManagerBusy] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && !localStorage.getItem("token")) { router.push("/login"); return; }
@@ -27,8 +32,13 @@ export default function MembersPage() {
 
   const load = useCallback(async () => {
     if (!slug) return;
-    const res = await api<{ members: Member[]; candidates: Candidate[]; is_manager: boolean; my_user_id: string }>(`/api/workspaces/${slug}/members`);
-    setMembers(res.members); setCandidates(res.candidates || []); setIsManager(res.is_manager); setMyId(res.my_user_id); setLoading(false);
+    const [mres, smres] = await Promise.all([
+      api<{ members: Member[]; candidates: Candidate[]; is_manager: boolean; my_user_id: string }>(`/api/workspaces/${slug}/members`),
+      api<{ managers: StandupManager[]; is_owner: boolean }>(`/api/workspaces/${slug}/standup/managers`).catch(() => ({ managers: [], is_owner: false })),
+    ]);
+    setMembers(mres.members); setCandidates(mres.candidates || []); setIsManager(mres.is_manager); setMyId(mres.my_user_id);
+    setStandupManagers(smres.managers); setIsOwner(smres.is_owner);
+    setLoading(false);
   }, [slug]);
 
   useEffect(() => { load(); }, [load]);
@@ -51,14 +61,28 @@ export default function MembersPage() {
     await load();
   }
 
+  async function addStandupManager() {
+    if (!managerPick) return;
+    setManagerBusy(true);
+    try { await api(`/api/workspaces/${slug}/standup/managers`, { method: "POST", body: { user_id: managerPick } }); setManagerPick(""); await load(); }
+    catch {} finally { setManagerBusy(false); }
+  }
+
+  async function removeStandupManager(userId: string) {
+    await api(`/api/workspaces/${slug}/standup/managers?user_id=${userId}`, { method: "DELETE" });
+    await load();
+  }
+
   if (loading) return (
     <div className="flex h-full items-center justify-center">
       <div className="flex flex-col items-center gap-3">
         <div className="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-600 animate-pulse-soft" />
-        <p className="text-sm text-text-secondary">Loading...</p>
       </div>
     </div>
   );
+
+  const existingManagerIds = new Set(standupManagers.map((m) => m.user_id));
+  const managerCandidates = members.filter((m) => !m.is_owner && !existingManagerIds.has(m.user_id));
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -90,7 +114,7 @@ export default function MembersPage() {
         </div>
       )}
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-hidden mb-5">
         <div className="divide-y divide-border-subtle">
           {members.map((m) => (
             <div key={m.user_id} className="list-item hover:bg-surface-muted">
@@ -118,6 +142,37 @@ export default function MembersPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Standup managers — only the owner can manage these */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Standup managers</h3>
+          <span className="text-[10px] text-text-tertiary">Can view all team standups</span>
+        </div>
+        <div className="divide-y divide-border-subtle mb-3">
+          {standupManagers.length === 0 && <p className="text-xs text-text-tertiary py-2">No standup managers added yet.</p>}
+          {standupManagers.map((sm) => (
+            <div key={sm.user_id} className="flex items-center gap-3 py-2">
+              <div className="avatar-sm bg-gradient-to-br from-amber-200 to-amber-500 text-white font-bold">
+                {sm.display_name?.[0]?.toUpperCase() || "?"}
+              </div>
+              <div className="flex-1 min-w-0 text-sm font-medium text-text-primary truncate">{sm.display_name || sm.user_id.slice(0, 8)}</div>
+              {isOwner && (
+                <button onClick={() => removeStandupManager(sm.user_id)} className="btn-ghost btn-sm text-text-tertiary hover:text-red-500">Remove</button>
+              )}
+            </div>
+          ))}
+        </div>
+        {isOwner && managerCandidates.length > 0 && (
+          <div className="flex gap-2">
+            <select value={managerPick} onChange={(e) => setManagerPick(e.target.value)} className="select flex-1">
+              <option value="">Select a member...</option>
+              {managerCandidates.map((m) => <option key={m.user_id} value={m.user_id}>{m.profile?.display_name || m.user_id.slice(0, 8)}</option>)}
+            </select>
+            <button onClick={addStandupManager} disabled={managerBusy || !managerPick} className="btn-primary btn-sm">{managerBusy ? "..." : "Add"}</button>
+          </div>
+        )}
       </div>
     </div>
   );

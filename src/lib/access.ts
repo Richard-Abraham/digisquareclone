@@ -104,6 +104,14 @@ export async function getCompletedState(projectId: string): Promise<string | nul
   return (data.find((s: { is_default?: boolean }) => s.is_default) ?? data[0]).id;
 }
 
+/** Check if a user can view all team standups (owner or designated standup manager). */
+export async function canViewAllStandups(workspaceId: string, userId: string, ownerId: string): Promise<boolean> {
+  if (userId === ownerId) return true;
+  const { data } = await getAdmin().from("standup_managers").select("user_id")
+    .eq("workspace_id", workspaceId).eq("user_id", userId).maybeSingle();
+  return !!data;
+}
+
 /** Find a sensible "active" state to move an issue back to when un-completing it. */
 export async function getActiveState(projectId: string): Promise<string | null> {
   const { data } = await getAdmin().from("states").select("id, group_name, is_default, sequence").eq("project_id", projectId).order("sequence");
