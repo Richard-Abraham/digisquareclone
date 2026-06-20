@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
-import { CheckIcon } from "@/components/icons";
+import { api, getToken } from "@/lib/api";
+import { CheckIcon, CloseIcon } from "@/components/icons";
 import { todayKey } from "@/lib/tasks";
 
 interface TaskRef { issue_id: string; title: string; ref: number | null; project_name: string; completed?: boolean }
@@ -39,6 +39,10 @@ export default function StandupPage() {
   const [savingPlan, setSavingPlan] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
   const [teamDate, setTeamDate] = useState(todayKey());
+  const [searchQ, setSearchQ] = useState("");
+  const [searchResults, setSearchResults] = useState<TaskRef[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -106,6 +110,30 @@ export default function StandupPage() {
     setCursor(res.next_cursor); setHistoryLoaded(true);
   }
 
+  // Search all tasks (not just assigned) to add to the plan
+  useEffect(() => {
+    if (!slug || searchQ.length < 2) { setSearchResults([]); setSearchOpen(false); return; }
+    const t = setTimeout(async () => {
+      try {
+        const token = getToken();
+        const res = await fetch(`/api/workspaces/${slug}/search-tasks?q=${encodeURIComponent(searchQ)}`, { headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json();
+        if (json.success) {
+          const filtered = json.data.filter((r: TaskRef) => !planIds.includes(r.issue_id));
+          setSearchResults(filtered); setSearchOpen(filtered.length > 0);
+        }
+      } catch { /* ignore */ }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [searchQ, slug, planIds]);
+
+  // Close search on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   useEffect(() => { if (tab === "history" && !historyLoaded) loadHistory(true); }, [tab]);
   useEffect(() => { if (tab === "history" && historyLoaded) loadHistory(true); }, [historyUserId]);
 
@@ -154,7 +182,31 @@ export default function StandupPage() {
                   </label>
                 ))}
               </div>
-              <button onClick={savePlan} disabled={savingPlan} className="btn-primary btn-sm mt-4">
+              {/* Search all tasks */}
+              <div ref={searchRef} className="relative mt-4">
+                <div className="flex items-center gap-2 bg-surface-2 rounded-lg px-3 py-1.5">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-tertiary flex-shrink-0">
+                    <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+                  </svg>
+                  <input value={searchQ} onChange={(e) => setSearchQ(e.target.value)}
+                    placeholder="Search all tasks..." className="flex-1 bg-transparent text-sm outline-none text-text-primary placeholder:text-text-tertiary" />
+                  {searchQ && <button onClick={() => { setSearchQ(""); setSearchOpen(false); }} className="text-text-tertiary hover:text-text-secondary"><CloseIcon size={14} /></button>}
+                </div>
+                {searchOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-border shadow-elevated z-10 max-h-48 overflow-y-auto animate-fade-in">
+                    {searchResults.map((r) => (
+                      <button key={r.issue_id} onClick={() => { togglePlanTask(r.issue_id); setSearchQ(""); setSearchOpen(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface-muted text-left">
+                        <span className="text-[10px] font-mono text-text-tertiary">#{r.ref}</span>
+                        <span className="flex-1 truncate text-text-primary font-medium">{r.title}</span>
+                        <span className="text-[10px] text-text-tertiary">{r.project_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button onClick={savePlan} disabled={savingPlan} className="btn-primary btn-sm mt-3">
                 {savingPlan ? "Saving..." : "Save plan"}
               </button>
             </div>
