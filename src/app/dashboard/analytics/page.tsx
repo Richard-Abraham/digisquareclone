@@ -1,7 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from "recharts";
+
+const GROUP_LABELS: Record<string, string> = { backlog: "Backlog", unstarted: "Todo", started: "In Progress", completed: "Done", cancelled: "Cancelled" };
+const GROUP_COLORS: Record<string, string> = { backlog: "#94A3B8", unstarted: "#6366F1", started: "#F59E0B", completed: "#10B981", cancelled: "#EF4444" };
 
 export default function AnalyticsPage() {
   const [tab, setTab] = useState<"overview" | "work-items">("overview");
@@ -22,17 +25,13 @@ export default function AnalyticsPage() {
     const wsJson = await wsRes.json();
     if (!wsJson.success || !wsJson.data.length) { setLoading(false); return; }
     const slug = wsJson.data[0].slug;
-
     const [ovRes, wiRes] = await Promise.all([
       fetch(`/api/workspaces/${slug}/analytics?tab=overview`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`/api/workspaces/${slug}/analytics?tab=work-items`, { headers: { Authorization: `Bearer ${token}` } }),
     ]);
-    const ov = await ovRes.json();
-    const wi = await wiRes.json();
+    const ov = await ovRes.json(); const wi = await wiRes.json();
     if (ov.success) setOverview(ov.data);
     if (wi.success) setWorkItems(wi.data);
-
-    // Project-level analytics
     const projRes = await fetch(`/api/workspaces/${slug}/projects`, { headers: { Authorization: `Bearer ${token}` } });
     const projJson = await projRes.json();
     if (projJson.success && projJson.data.length) {
@@ -40,78 +39,93 @@ export default function AnalyticsPage() {
       const pa = await paRes.json();
       if (pa.success) setProjectAnalytics(pa.data);
     }
-
     setLoading(false);
   }
 
-  if (loading) return <div className="flex h-full items-center justify-center text-[#5e6574]">Loading analytics...</div>;
-
-  const GROUP_LABELS: Record<string, string> = { backlog: "Backlog", unstarted: "Todo", started: "In Progress", completed: "Done", cancelled: "Cancelled" };
-  const GROUP_COLORS: Record<string, string> = { backlog: "#a3a3a3", unstarted: "#3f76ff", started: "#f59e0b", completed: "#16a34a", cancelled: "#dc2626" };
+  if (loading) return (
+    <div className="flex h-full items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-600 animate-pulse-soft" />
+        <p className="text-sm text-text-secondary">Loading analytics...</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-xl font-bold text-[#1a1d23] mb-6">Analytics</h1>
+      <div className="section-header">
+        <div>
+          <h1 className="section-title">Analytics</h1>
+          <p className="section-desc">Track progress, trends, and team activity</p>
+        </div>
+      </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-[#f1f3f8] rounded-lg p-1 w-fit">
-        <button onClick={() => setTab("overview")} className={`rounded-md px-4 py-1.5 text-sm transition-colors ${tab === "overview" ? "bg-white shadow-sm font-medium text-[#1a1d23]" : "text-[#5e6574] hover:text-[#1a1d23]"}`}>Overview</button>
-        <button onClick={() => setTab("work-items")} className={`rounded-md px-4 py-1.5 text-sm transition-colors ${tab === "work-items" ? "bg-white shadow-sm font-medium text-[#1a1d23]" : "text-[#5e6574] hover:text-[#1a1d23]"}`}>Work Items</button>
+      <div className="flex gap-1 mb-6 bg-surface-2 rounded-lg p-1 w-fit">
+        <button onClick={() => setTab("overview")}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${tab === "overview" ? "bg-white shadow-sm text-text-primary" : "text-text-secondary hover:text-text-primary"}`}>Overview</button>
+        <button onClick={() => setTab("work-items")}
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${tab === "work-items" ? "bg-white shadow-sm text-text-primary" : "text-text-secondary hover:text-text-primary"}`}>Work Items</button>
       </div>
 
       {tab === "overview" && overview && (
-        <div className="space-y-6">
-          {/* Summary cards */}
+        <div className="space-y-6 animate-fade-in">
           <div className="grid grid-cols-3 gap-4">
-            <Card label="Total Projects" value={overview.total_projects} />
-            <Card label="Total Tasks" value={overview.total_work_items} />
-            <Card label="Team Members" value={overview.total_members} />
+            <div className="card p-5">
+              <p className="text-3xl font-bold text-text-primary">{overview.total_projects.toLocaleString()}</p>
+              <p className="text-xs text-text-secondary mt-1 font-medium">Total Projects</p>
+            </div>
+            <div className="card p-5">
+              <p className="text-3xl font-bold text-text-primary">{overview.total_work_items.toLocaleString()}</p>
+              <p className="text-xs text-text-secondary mt-1 font-medium">Total Tasks</p>
+            </div>
+            <div className="card p-5">
+              <p className="text-3xl font-bold text-text-primary">{overview.total_members.toLocaleString()}</p>
+              <p className="text-xs text-text-secondary mt-1 font-medium">Team Members</p>
+            </div>
           </div>
 
-          {/* Monthly trend chart */}
           {projectAnalytics?.monthly_trend?.length > 0 && (
-            <div className="bg-white rounded-xl border border-[#eef0f6] p-5">
-              <h3 className="text-sm font-semibold text-[#1a1d23] mb-4">Monthly Created vs Completed</h3>
+            <div className="card p-5">
+              <h3 className="text-sm font-semibold text-text-primary mb-4">Monthly Created vs Completed</h3>
               <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={projectAnalytics.monthly_trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f3f8" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                  <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="created" stroke="#3f76ff" strokeWidth={2} dot={false} name="Created" />
-                  <Line type="monotone" dataKey="completed" stroke="#16a34a" strokeWidth={2} dot={false} name="Completed" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #E2E8F0", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)" }} />
+                  <Line type="monotone" dataKey="created" stroke="#6366F1" strokeWidth={2.5} dot={{ r: 3 }} name="Created" />
+                  <Line type="monotone" dataKey="completed" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3 }} name="Completed" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           )}
 
-          {/* Priority distribution */}
           {projectAnalytics?.priority_distribution && (
-            <div className="bg-white rounded-xl border border-[#eef0f6] p-5">
-              <h3 className="text-sm font-semibold text-[#1a1d23] mb-4">Priority Distribution</h3>
+            <div className="card p-5">
+              <h3 className="text-sm font-semibold text-text-primary mb-4">Priority Distribution</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={Object.entries(projectAnalytics.priority_distribution).map(([k, v]) => ({ name: k, count: v }))}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                  <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#3f76ff" radius={[4, 4, 0, 0]} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #E2E8F0" }} />
+                  <Bar dataKey="count" fill="#6366F1" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           )}
 
-          {/* State breakdown */}
           {projectAnalytics?.state_groups && (
-            <div className="bg-white rounded-xl border border-[#eef0f6] p-5">
-              <h3 className="text-sm font-semibold text-[#1a1d23] mb-4">State Breakdown</h3>
+            <div className="card p-5">
+              <h3 className="text-sm font-semibold text-text-primary mb-4">State Breakdown</h3>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={Object.entries(projectAnalytics.state_groups).map(([k, v]) => ({ name: GROUP_LABELS[k] || k, count: v, fill: GROUP_COLORS[k] }))}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                  <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                  <Tooltip />
-                  <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                    {Object.entries(projectAnalytics.state_groups).map(([k]) => <Bar key={k} dataKey="count" fill={GROUP_COLORS[k] || "#3f76ff"} radius={[4, 4, 0, 0]} />)}
+                <BarChart data={Object.entries(projectAnalytics.state_groups).map(([k, v]) => ({ name: GROUP_LABELS[k] || k, count: v }))}>
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #E2E8F0" }} />
+                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                    {Object.entries(projectAnalytics.state_groups).map(([k]) => (
+                      <Bar key={k} dataKey="count" fill={GROUP_COLORS[k] || "#6366F1"} radius={[6, 6, 0, 0]} />
+                    ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -121,43 +135,33 @@ export default function AnalyticsPage() {
       )}
 
       {tab === "work-items" && workItems && (
-        <div className="space-y-4">
+        <div className="space-y-6 animate-fade-in">
           <div className="grid grid-cols-5 gap-3">
             {Object.entries(workItems).map(([k, v]) => (
-              <div key={k} className="bg-white rounded-xl border border-[#eef0f6] p-4 text-center">
-                <p className="text-2xl font-bold" style={{ color: GROUP_COLORS[k] }}>{(v as number).toLocaleString()}</p>
-                <p className="text-xs text-[#5e6574] mt-1">{GROUP_LABELS[k] || k}</p>
+              <div key={k} className="card p-4 text-center">
+                <p className="text-2xl font-extrabold" style={{ color: GROUP_COLORS[k] }}>{(v as number).toLocaleString()}</p>
+                <p className="text-xs text-text-secondary mt-1 font-medium">{GROUP_LABELS[k] || k}</p>
               </div>
             ))}
           </div>
 
           {projectAnalytics?.monthly_trend?.length > 0 && (
-            <div className="bg-white rounded-xl border border-[#eef0f6] p-5">
-              <h3 className="text-sm font-semibold text-[#1a1d23] mb-4">Created vs Resolved Over Time</h3>
+            <div className="card p-5">
+              <h3 className="text-sm font-semibold text-text-primary mb-4">Created vs Resolved Over Time</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={projectAnalytics.monthly_trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f3f8" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                  <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="created" stroke="#3f76ff" strokeWidth={2} name="Created" />
-                  <Line type="monotone" dataKey="completed" stroke="#16a34a" strokeWidth={2} name="Completed" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #E2E8F0" }} />
+                  <Line type="monotone" dataKey="created" stroke="#6366F1" strokeWidth={2.5} dot={{ r: 3 }} name="Created" />
+                  <Line type="monotone" dataKey="completed" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3 }} name="Completed" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function Card({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="bg-white rounded-xl border border-[#eef0f6] p-5">
-      <p className="text-2xl font-bold text-[#1a1d23]">{value.toLocaleString()}</p>
-      <p className="text-xs text-[#5e6574] mt-1">{label}</p>
     </div>
   );
 }

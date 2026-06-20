@@ -19,11 +19,14 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const search = url.searchParams.get("search");
   const bugs = url.searchParams.get("bugs");
   const tag = url.searchParams.get("tag");
+  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
+  const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get("pageSize") || "50", 10)));
+  const offset = (page - 1) * pageSize;
 
   let q = getAdmin().from("issues").select(
     "*, state:states(*), assignees:issue_assignees(user_id), tags:issue_tags(tag_id), subtasks:issue_subtasks(done), reviewers:issue_reviewers(user_id, state)",
     { count: "exact" }
-  ).eq("project_id", params.projectId).is("archived_at", null).eq("is_draft", false).order("sequence_id");
+  ).eq("project_id", params.projectId).is("archived_at", null).eq("is_draft", false).order("sequence_id").range(offset, offset + pageSize - 1);
   if (state) q = q.eq("state_id", state);
   if (priority) q = q.eq("priority", priority);
   if (assignee) q = q.eq("assignee_id", assignee);
@@ -52,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     changes_requested: (i.reviewers || []).some((r: any) => r.state === "changes_requested"),
   }));
 
-  return ok({ issues: enriched, total: count || 0 });
+  return ok({ issues: enriched, total: count || 0, page, pageSize });
 }
 
 export async function POST(req: NextRequest, { params }: { params: { slug: string; projectId: string } }) {

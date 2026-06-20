@@ -28,11 +28,16 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   let candidates: { user_id: string; display_name: string }[] = [];
   if (access.isManager) {
-    const memberSet = new Set(ids);
-    const { data: all } = await getAdmin().from("profiles").select("user_id, display_name").order("display_name");
-    candidates = (all || [])
-      .filter((p: any) => !memberSet.has(p.user_id))
-      .map((p: any) => ({ user_id: p.user_id, display_name: p.display_name }));
+    if (ids.length) {
+      // Use NOT IN to delegate filtering to PostgREST instead of fetching all profiles
+      const { data: all } = await getAdmin().from("profiles").select("user_id, display_name")
+        .filter("user_id", "not.in", `(${ids.join(",")})`)
+        .order("display_name");
+      candidates = (all || []).map((p: any) => ({ user_id: p.user_id, display_name: p.display_name }));
+    } else {
+      const { data: all } = await getAdmin().from("profiles").select("user_id, display_name").order("display_name");
+      candidates = (all || []).map((p: any) => ({ user_id: p.user_id, display_name: p.display_name }));
+    }
   }
 
   return ok({ members: rows, candidates, is_manager: access.isManager, my_user_id: user.id });

@@ -24,12 +24,16 @@ async function overviewStats(wsId: string) {
 }
 
 async function workItemsStats(wsId: string) {
-  const { data: states } = await getAdmin().from("states").select("id, group_name").eq("workspace_id", wsId);
+  const { data: rows } = await getAdmin()
+    .from("states")
+    .select("group_name, issue_count:issues(count)")
+    .eq("workspace_id", wsId);
+
   const groups: Record<string, number> = {};
   for (const g of ["backlog", "unstarted", "started", "completed", "cancelled"]) groups[g] = 0;
-  for (const s of states || []) {
-    const { count } = await getAdmin().from("issues").select("id", { count: "exact", head: true }).eq("workspace_id", wsId).eq("state_id", s.id).is("archived_at", null);
-    groups[s.group_name] = (groups[s.group_name] || 0) + (count || 0);
+  for (const s of rows || []) {
+    const count = (s as any).issue_count?.[0]?.count ?? 0;
+    groups[s.group_name] = (groups[s.group_name] || 0) + count;
   }
   return groups;
 }

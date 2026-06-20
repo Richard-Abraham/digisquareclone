@@ -10,13 +10,14 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
 
   const { data: states } = await getAdmin().from("states").select("*").eq("project_id", params.projectId).order("sequence");
-  const { data: issues } = await getAdmin().from("issues").select("created_at, completed_at, priority").eq("project_id", params.projectId).is("archived_at", null);
+  const { data: issues } = await getAdmin().from("issues").select("created_at, completed_at, priority, state_id").eq("project_id", params.projectId).is("archived_at", null);
 
-  // State breakdown
+  // State breakdown — single pass over issues instead of N+1 COUNT queries
   const stateCounts: Record<string, number> = {};
-  for (const s of states || []) {
-    const { count } = await getAdmin().from("issues").select("id", { count: "exact", head: true }).eq("project_id", params.projectId).eq("state_id", s.id).is("archived_at", null);
-    stateCounts[s.group_name] = (stateCounts[s.group_name] || 0) + (count || 0);
+  const stateGroup = new Map((states || []).map((s: any) => [s.id, s.group_name]));
+  for (const iss of issues || []) {
+    const grp = stateGroup.get(iss.state_id) || "backlog";
+    stateCounts[grp] = (stateCounts[grp] || 0) + 1;
   }
 
   // Monthly trend
