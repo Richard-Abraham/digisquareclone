@@ -6,7 +6,9 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run"
+    "test": "vitest run",
+    "migrate": "supabase db push",
+    "migrate:watch": "supabase db push && while inotifywait -e close_write supabase/migrations/; do supabase db push; done"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
