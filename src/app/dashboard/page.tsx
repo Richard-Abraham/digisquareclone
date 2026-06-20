@@ -169,7 +169,7 @@ export default function IssuesPage() {
   );
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="section-header">
         <div className="flex items-center gap-3">
@@ -178,12 +178,12 @@ export default function IssuesPage() {
             <p className="section-desc">{total} total tasks</p>
           </div>
           {projects.length > 0 && (
-            <select value={projId} onChange={e => selectProject(e.target.value)} className="select text-xs ml-2 -mt-1">
+            <select value={projId} onChange={e => selectProject(e.target.value)} className="select text-xs sm:ml-2 -mt-1">
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-shrink-0">
           <button onClick={() => setShowProj(true)} className="btn-secondary btn-sm">+ Project</button>
           <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">+ New Task</button>
         </div>
@@ -207,8 +207,8 @@ export default function IssuesPage() {
           className="input-sm w-auto min-w-[200px]" />
       </div>
 
-      {/* Kanban */}
-      <div className="grid grid-cols-5 gap-4">
+      {/* Kanban — horizontal scroll on tablet, stack on mobile */}
+      <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory md:grid md:grid-cols-5">
         {["backlog", "unstarted", "started", "completed", "cancelled"].map(group => {
           const cols = groupByState(group);
           const items = cols[group] || [];
@@ -220,7 +220,7 @@ export default function IssuesPage() {
               onDragOver={e => { if (droppable) { e.preventDefault(); setDragOverGroup(group); } }}
               onDragLeave={() => setDragOverGroup(g => g === group ? null : g)}
               onDrop={() => { if (dragId) moveIssueToGroup(dragId, group); setDragId(null); setDragOverGroup(null); }}
-              className={`rounded-xl p-3 transition-all duration-200 ${isOver ? "bg-primary-50 ring-2 ring-primary-300" : "bg-surface-2"}`}>
+              className={`min-w-[260px] snap-start rounded-xl p-3 transition-all duration-200 ${isOver ? "bg-primary-50 ring-2 ring-primary-300" : "bg-surface-2"}`}>
               <div className="flex items-center justify-between mb-3 px-1">
                 <div className="flex items-center gap-2">
                   <span className="size-2 rounded-full" style={{ backgroundColor: stateInfo?.color }} />
@@ -311,8 +311,8 @@ export default function IssuesPage() {
 
       {/* Create project modal */}
       {showProj && (
-        <div className="modal-overlay" onClick={() => setShowProj(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowProj(false)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-modal w-full sm:max-w-md animate-slide-up p-5 sm:p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-lg text-text-primary mb-1">New Project</h2>
             <p className="text-sm text-text-secondary mb-4">Create a new project to organize tasks.</p>
             <div className="space-y-3">
@@ -331,8 +331,8 @@ export default function IssuesPage() {
 
       {/* Create issue modal */}
       {showCreate && (
-        <div className="modal-overlay" onClick={() => setShowCreate(false)}>
-          <div className="modal-content max-w-lg" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowCreate(false)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-modal w-full sm:max-w-lg animate-slide-up p-5 sm:p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-lg text-text-primary mb-1">Create Task</h2>
             <p className="text-sm text-text-secondary mb-4">Add a new task to the current project.</p>
             <div className="space-y-4">

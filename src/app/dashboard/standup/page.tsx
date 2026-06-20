@@ -115,7 +115,7 @@ export default function StandupPage() {
   ).filter((t, i, arr) => arr.findIndex((x) => x.issue_id === t.issue_id) === i && planIds.includes(t.issue_id));
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
       <div className="section-header">
         <div>
           <h1 className="section-title">Daily Standup</h1>
@@ -133,8 +133,8 @@ export default function StandupPage() {
       </div>
 
       {tab === "today" && (
-        <div className="grid grid-cols-3 gap-5">
-          <div className="col-span-2 space-y-5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 space-y-5">
             {/* Plan */}
             <div className="card p-5">
               <h2 className="text-sm font-bold text-text-primary mb-3">Today&apos;s plan</h2>
@@ -215,7 +215,7 @@ export default function StandupPage() {
 
           {/* Team standups */}
           {isManager && (
-            <div className="col-span-3 card p-5">
+            <div className="lg:col-span-3 card p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold text-text-primary">
                   {teamDate === todayKey() ? "Team standups today" : `Team standups — ${new Date(teamDate).toLocaleDateString()}`}

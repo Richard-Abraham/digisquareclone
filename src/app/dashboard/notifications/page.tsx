@@ -40,7 +40,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-2xl mx-auto">
       <div className="section-header">
         <div>
           <h1 className="section-title">Notifications</h1>

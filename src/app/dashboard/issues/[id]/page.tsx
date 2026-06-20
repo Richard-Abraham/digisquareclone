@@ -122,7 +122,7 @@ export default function IssueDetailPage() {
   const prio = PRIO_META[issue.priority] || PRIO_META.none;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-5">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-5">
       {/* Back + header */}
       <div className="flex items-center gap-3">
         <Link href="/dashboard" className="btn-ghost btn-icon btn-sm -ml-2">
@@ -148,7 +148,7 @@ export default function IssueDetailPage() {
           <input value={editName} onChange={(e) => setEditName(e.target.value)}
             className="input text-base font-semibold" />
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">State</label>
             <select value={editState} onChange={(e) => setEditState(e.target.value)} className="select">
@@ -183,7 +183,7 @@ export default function IssueDetailPage() {
       </div>
 
       {/* Assignees + Tags */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="card p-5">
           <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-3">Assignees</h3>
           <div className="flex flex-wrap gap-1.5">

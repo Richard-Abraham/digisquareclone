@@ -85,7 +85,7 @@ export default function MembersPage() {
   const managerCandidates = members.filter((m) => !m.is_owner && !existingManagerIds.has(m.user_id));
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto">
       <div className="section-header">
         <div>
           <h1 className="section-title">Members</h1>

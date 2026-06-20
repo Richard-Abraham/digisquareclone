@@ -52,7 +52,7 @@ export default function AnalyticsPage() {
   );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
       <div className="section-header">
         <div>
           <h1 className="section-title">Analytics</h1>
@@ -69,7 +69,7 @@ export default function AnalyticsPage() {
 
       {tab === "overview" && overview && (
         <div className="space-y-6 animate-fade-in">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="card p-5">
               <p className="text-3xl font-bold text-text-primary">{overview.total_projects.toLocaleString()}</p>
               <p className="text-xs text-text-secondary mt-1 font-medium">Total Projects</p>
@@ -136,7 +136,7 @@ export default function AnalyticsPage() {
 
       {tab === "work-items" && workItems && (
         <div className="space-y-6 animate-fade-in">
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             {Object.entries(workItems).map(([k, v]) => (
               <div key={k} className="card p-4 text-center">
                 <p className="text-2xl font-extrabold" style={{ color: GROUP_COLORS[k] }}>{(v as number).toLocaleString()}</p>

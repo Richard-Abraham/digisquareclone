@@ -23,7 +23,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-indigo-50 p-4">
+    <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-indigo-50 p-4 sm:p-6">
       <div className="w-full max-w-sm animate-slide-up">
         {/* Brand */}
         <div className="text-center mb-8">
