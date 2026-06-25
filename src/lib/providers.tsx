@@ -1,6 +1,5 @@
 "use client";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { getToken } from "./api";
 
@@ -20,17 +19,6 @@ const AuthContext = createContext<AuthState>({
 });
 
 export const useAuth = () => useContext(AuthContext);
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      gcTime: 5 * 60_000,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -66,10 +54,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => { refresh(); }, [refresh]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthContext.Provider value={{ user, profile, ready, refresh }}>
-        {children}
-      </AuthContext.Provider>
-    </QueryClientProvider>
+    <AuthContext.Provider value={{ user, profile, ready, refresh }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
