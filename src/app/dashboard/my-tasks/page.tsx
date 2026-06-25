@@ -62,7 +62,7 @@ export default function MyTasksPage() {
         {VIEWS.map((v) => (
           <button key={v.key} onClick={() => setView(v.key)}
             className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all
-              ${view === v.key ? "bg-white shadow-sm text-text-primary" : "text-text-secondary hover:text-text-primary"}`}>
+              ${view === v.key ? "bg-surface-1 shadow-sm text-text-primary" : "text-text-secondary hover:text-text-primary"}`}>
             {v.label}
           </button>
         ))}

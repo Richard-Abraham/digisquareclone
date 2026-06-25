@@ -62,9 +62,9 @@ export default function AnalyticsPage() {
 
       <div className="flex gap-1 mb-6 bg-surface-2 rounded-lg p-1 w-fit">
         <button onClick={() => setTab("overview")}
-          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${tab === "overview" ? "bg-white shadow-sm text-text-primary" : "text-text-secondary hover:text-text-primary"}`}>Overview</button>
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${tab === "overview" ? "bg-surface-1 shadow-sm text-text-primary" : "text-text-secondary hover:text-text-primary"}`}>Overview</button>
         <button onClick={() => setTab("work-items")}
-          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${tab === "work-items" ? "bg-white shadow-sm text-text-primary" : "text-text-secondary hover:text-text-primary"}`}>Work Items</button>
+          className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${tab === "work-items" ? "bg-surface-1 shadow-sm text-text-primary" : "text-text-secondary hover:text-text-primary"}`}>Work Items</button>
       </div>
 
       {tab === "overview" && overview && (

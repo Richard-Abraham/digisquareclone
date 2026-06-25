@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   let q = getAdmin().from("issues").select(
     "*, state:states(*), assignees:issue_assignees(user_id), tags:issue_tags(tag_id), subtasks:issue_subtasks(done), reviewers:issue_reviewers(user_id, state)",
     { count: "exact" }
-  ).eq("project_id", params.projectId).is("archived_at", null).eq("is_draft", false).order("sequence_id").range(offset, offset + pageSize - 1);
+  ).eq("project_id", params.projectId).is("archived_at", null).eq("is_draft", false).order("sort_order").order("sequence_id", { ascending: false }).range(offset, offset + pageSize - 1);
   if (state) q = q.eq("state_id", state);
   if (priority) q = q.eq("priority", priority);
   if (assignee) q = q.eq("assignee_id", assignee);
@@ -87,6 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     description_html: body.description_html || "<p></p>", priority: body.priority || "none",
     state_id: body.state_id || ds?.id || null, assignee_id: assigneeIds[0] || null,
     is_bug: !!body.is_bug, created_by: user.id, updated_by: user.id, sequence_id: nextSeq,
+    sort_order: nextSeq,
     start_date: body.start_date || null, target_date: body.target_date || null, parent_id: body.parent_id || null,
   }).select("*, state:states(*)").single();
   if (ie) return err(ie.message, 400);

@@ -288,7 +288,7 @@ export default function IssueDetailPage() {
           <input value={depSearch} onChange={(e) => setDepSearch(e.target.value)} placeholder="Link a task..."
             className="input-sm w-full text-xs" />
           {depResults.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg border border-border shadow-elevated z-10 max-h-32 overflow-y-auto">
+            <div className="absolute left-0 right-0 top-full mt-1 bg-surface-1 rounded-lg border border-border shadow-elevated z-10 max-h-32 overflow-y-auto">
               {depResults.map((r: any) => (
                 <button key={r.id} onClick={() => addDep(r.id)}
                   className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-muted truncate">{r.name}</button>

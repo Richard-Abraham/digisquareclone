@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: "class",
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
@@ -14,15 +15,24 @@ module.exports = {
           700: "#4338CA", 800: "#3730A3", 900: "#312E81",
         },
         surface: {
-          DEFAULT: "#F8FAFC", 1: "#FFFFFF", 2: "#F1F5F9", 3: "#E2E8F0",
-          muted: "#F8FAFC", card: "#FFFFFF",
+          DEFAULT: "rgb(var(--surface) / <alpha-value>)",
+          1: "rgb(var(--surface-1) / <alpha-value>)",
+          2: "rgb(var(--surface-2) / <alpha-value>)",
+          3: "rgb(var(--surface-3) / <alpha-value>)",
+          muted: "rgb(var(--surface-muted) / <alpha-value>)",
+          card: "rgb(var(--surface-card) / <alpha-value>)",
         },
         border: {
-          DEFAULT: "#E2E8F0", subtle: "#F1F5F9", accent: "#CBD5E1",
+          DEFAULT: "rgb(var(--border) / <alpha-value>)",
+          subtle: "rgb(var(--border-subtle) / <alpha-value>)",
+          accent: "rgb(var(--border-accent) / <alpha-value>)",
         },
         text: {
-          primary: "#0F172A", secondary: "#475569", tertiary: "#94A3B8",
-          placeholder: "#CBD5E1", inverse: "#FFFFFF",
+          primary: "rgb(var(--text-primary) / <alpha-value>)",
+          secondary: "rgb(var(--text-secondary) / <alpha-value>)",
+          tertiary: "rgb(var(--text-tertiary) / <alpha-value>)",
+          placeholder: "rgb(var(--text-placeholder) / <alpha-value>)",
+          inverse: "rgb(var(--text-inverse) / <alpha-value>)",
         },
         status: {
           backlog: "#94A3B8", unstarted: "#6366F1", started: "#F59E0B",

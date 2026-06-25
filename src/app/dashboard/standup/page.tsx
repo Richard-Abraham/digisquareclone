@@ -125,7 +125,7 @@ export default function StandupPage() {
           {(["today", "history"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={`rounded-md px-4 py-1.5 text-sm font-medium capitalize transition-all
-                ${tab === t ? "bg-white shadow-sm text-text-primary" : "text-text-secondary hover:text-text-primary"}`}>
+                ${tab === t ? "bg-surface-1 shadow-sm text-text-primary" : "text-text-secondary hover:text-text-primary"}`}>
               {t}
             </button>
           ))}

@@ -1,25 +1,30 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import {
+  DndContext, DragOverlay, PointerSensor, KeyboardSensor,
+  useSensor, useSensors, closestCorners, type DragStartEvent, type DragEndEvent, type DragOverEvent, type DragCancelEvent,
+} from "@dnd-kit/core";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useAuth } from "@/lib/providers";
 import { deriveIdentifier } from "@/lib/tasks";
-import { BugIcon } from "@/components/icons";
+import { TasksIcon } from "@/components/icons";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
 import IssuePanel from "./issue-panel";
+import {
+  KanbanColumn, DragPreviewCard, GROUPS, PRIORITIES, PRIO_META,
+  type Issue, type State, type Group,
+} from "./kanban-parts";
 
-interface Issue { id: string; name: string; priority: string; sequence_id: number; is_bug?: boolean; subtask_total?: number; subtask_done?: number; state: { id: string; name: string; group_name: string; color: string } | null; assignee: { display_name: string } | null; assignees: { user_id?: string; display_name?: string }[]; created_at: string; target_date: string | null; creator?: { display_name?: string } | null; }
-interface State { id: string; name: string; group_name: string; color: string; }
 interface Member { user_id: string; profile: { display_name: string } | null; }
 
-const PRIORITIES = ["urgent", "high", "medium", "low", "none"] as const;
-const PRIO_META: Record<string, { label: string; color: string; bg: string }> = {
-  urgent: { label: "Urgent", color: "#DC2626", bg: "#FEF2F2" },
-  high: { label: "High", color: "#D97706", bg: "#FFFBEB" },
-  medium: { label: "Medium", color: "#6366F1", bg: "#EEF2FF" },
-  low: { label: "Low", color: "#64748B", bg: "#F1F5F9" },
-  none: { label: "None", color: "#CBD5E1", bg: "#F8FAFC" },
-};
-
 const PAGE_SIZE = 50;
+
+function emptyColumns(): Record<Group, Issue[]> {
+  return { backlog: [], unstarted: [], started: [], completed: [], cancelled: [] };
+}
 
 export default function IssuesPage() {
   const { ready, user } = useAuth();
@@ -41,14 +46,15 @@ export default function IssuesPage() {
   const [wsSlug, setWsSlug] = useState("");
   const [projId, setProjId] = useState("");
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [dragOverGroup, setDragOverGroup] = useState<string | null>(null);
   const [showProj, setShowProj] = useState(false);
   const [newProjName, setNewProjName] = useState("");
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [columns, setColumns] = useState<Record<Group, Issue[]>>(emptyColumns());
   const router = useRouter();
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   useEffect(() => {
     if (!ready) return;
@@ -58,22 +64,21 @@ export default function IssuesPage() {
   }, [ready]);
 
   async function loadAll() {
-    const wsRes = await fetch("/api/workspaces", { headers: { Authorization: `Bearer ${token}` } });
+    const wsRes = await fetch("/api/workspaces", { headers: authHeaders });
     const wsJson = await wsRes.json();
     if (!wsJson.success || !wsJson.data.length) { setLoading(false); return; }
     const slug = wsJson.data[0].slug;
     setWsSlug(slug);
-    const projRes = await fetch(`/api/workspaces/${slug}/projects`, { headers: { Authorization: `Bearer ${token}` } });
+    const projRes = await fetch(`/api/workspaces/${slug}/projects`, { headers: authHeaders });
     const projJson = await projRes.json();
     if (!projJson.success || !projJson.data.length) { setLoading(false); return; }
     setProjects(projJson.data);
     const lastPid = localStorage.getItem(`lastProject:${slug}`);
     const pid = (lastPid && projJson.data.some((p: any) => p.id === lastPid)) ? lastPid : projJson.data[0].id;
     setProjId(pid);
-    const h = { headers: { Authorization: `Bearer ${token}` } };
     await Promise.all([
-      fetch(`/api/workspaces/${slug}/members`, h).then(r => r.json()).then(j => { if (j.success) setMembers((j.data.members || []).map((m: any) => ({ user_id: m.user_id, profile: m.profile }))); }),
-      fetch(`/api/workspaces/${slug}/projects/${pid}/states`, h).then(r => r.json()).then(j => { if (j.success) setStates(j.data); }),
+      fetch(`/api/workspaces/${slug}/members`, { headers: authHeaders }).then(r => r.json()).then(j => { if (j.success) setMembers((j.data.members || []).map((m: any) => ({ user_id: m.user_id, profile: m.profile }))); }),
+      fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { headers: authHeaders }).then(r => r.json()).then(j => { if (j.success) setStates(j.data); }),
       loadIssues(slug, pid),
     ]);
   }
@@ -81,7 +86,7 @@ export default function IssuesPage() {
   async function selectProject(pid: string, slug = wsSlug) {
     setProjId(pid); setPage(1);
     localStorage.setItem(`lastProject:${slug}`, pid);
-    const sRes = await fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { headers: { Authorization: `Bearer ${token}` } });
+    const sRes = await fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { headers: authHeaders });
     const sJson = await sRes.json();
     if (sJson.success) setStates(sJson.data);
     await loadIssues(slug, pid);
@@ -90,7 +95,7 @@ export default function IssuesPage() {
   async function createProject() {
     if (!newProjName.trim()) return;
     const res = await fetch(`/api/workspaces/${wsSlug}/projects`, {
-      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      method: "POST", headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify({ name: newProjName }),
     });
     const json = await res.json();
@@ -106,19 +111,28 @@ export default function IssuesPage() {
     if (filterSearch) params.set("search", filterSearch);
     params.set("page", String(pg || page));
     params.set("pageSize", String(PAGE_SIZE));
-    const res = await fetch(`/api/workspaces/${s}/projects/${p}/issues?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`/api/workspaces/${s}/projects/${p}/issues?${params}`, { headers: authHeaders });
     const json = await res.json();
     if (json.success) { setIssues(json.data.issues); setTotal(json.data.total); }
     setLoading(false);
-  }, [wsSlug, projId, filterState, filterPriority, filterAssignee, filterSearch, page, token]);
+  }, [wsSlug, projId, filterState, filterPriority, filterAssignee, filterSearch, page, authHeaders]);
 
   useEffect(() => { if (wsSlug && projId) { setPage(1); loadIssues(); } }, [filterState, filterPriority, filterAssignee, filterSearch]);
   useEffect(() => { if (wsSlug && projId) loadIssues(); }, [page]);
 
+  // Derive columns from server data; sync local board when data changes (not during a drag).
+  const derivedColumns = useMemo(() => {
+    const g = emptyColumns();
+    for (const i of issues) { const k = (i.state?.group_name as Group) || "backlog"; g[k].push(i); }
+    for (const k of GROUPS) g[k].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    return g;
+  }, [issues]);
+  useEffect(() => { setColumns(derivedColumns); }, [derivedColumns]);
+
   async function createIssue() {
     if (!newName.trim()) return;
     const res = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues`, {
-      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      method: "POST", headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify({ name: newName, priority: newPriority, assignee_ids: newAssigneeIds, is_bug: newBug }),
     });
     const json = await res.json();
@@ -132,24 +146,142 @@ export default function IssuesPage() {
     setNewAssigneeIds((cur) => cur.includes(uid) ? cur.filter((x) => x !== uid) : [...cur, uid]);
   }
 
-  const groupByState = (state: string) => {
-    const gs: Record<string, Issue[]> = {};
-    for (const i of issues) { const k = i.state?.group_name || "backlog"; if (state === "all" || k === state) { gs[k] = gs[k] || []; gs[k].push(i); } }
-    return gs;
-  };
-
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  async function moveIssueToGroup(issueId: string, group: string) {
-    const target = states.find(s => s.group_name === group);
-    const issue = issues.find(i => i.id === issueId);
-    if (!target || !issue || issue.state?.group_name === group) return;
-    setIssues(prev => prev.map(i => i.id === issueId ? { ...i, state: { id: target.id, name: target.name, group_name: target.group_name, color: target.color } } : i));
-    await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${issueId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ state_id: target.id }),
+  // ---- Drag and drop ----
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  function groupOf(id: string): Group | null {
+    for (const g of GROUPS) if (columns[g].some((i) => i.id === id)) return g;
+    return null;
+  }
+
+  function handleDragStart(e: DragStartEvent) {
+    setActiveId(e.active.id as string);
+  }
+
+  function handleDragCancel(_e: DragCancelEvent) {
+    setActiveId(null);
+    setColumns(derivedColumns);
+  }
+
+  function handleDragOver(e: DragOverEvent) {
+    const { active, over } = e;
+    if (!over) return;
+    const activeIdLocal = active.id as string;
+
+    let overGroup: Group | null = null;
+    if (GROUPS.includes(over.id as Group)) overGroup = over.id as Group;
+    else overGroup = groupOf(over.id as string);
+    const fromGroup = groupOf(activeIdLocal);
+    if (!overGroup || !fromGroup || fromGroup === overGroup) return;
+    if (!states.some((s) => s.group_name === overGroup)) return;
+
+    setColumns((prev) => {
+      const next = { ...prev };
+      const fromItems = [...prev[fromGroup!]];
+      const toItems = [...prev[overGroup!]];
+      const idx = fromItems.findIndex((i) => i.id === activeIdLocal);
+      if (idx < 0) return prev;
+      const [moved] = fromItems.splice(idx, 1);
+      let insertAt = toItems.length;
+      if (!GROUPS.includes(over.id as Group)) {
+        const oi = toItems.findIndex((i) => i.id === over.id);
+        if (oi >= 0) insertAt = oi;
+      }
+      toItems.splice(insertAt, 0, moved);
+      next[fromGroup!] = fromItems;
+      next[overGroup!] = toItems;
+      return next;
     });
   }
+
+  async function handleDragEnd(e: DragEndEvent) {
+    const movedId = e.active.id as string;
+    const overId = e.over?.id;
+    setActiveId(null);
+
+    const movedIssue = issues.find((i) => i.id === movedId);
+    if (!movedIssue || overId == null) { setColumns(derivedColumns); return; }
+
+    const fromGroup = (movedIssue.state?.group_name as Group) || "backlog";
+
+    // Compute the final arrangement from server truth (derivedColumns) + drop target,
+    // so same-column reorders and cross-column moves are both handled deterministically.
+    const base: Record<Group, Issue[]> = {
+      backlog: [...derivedColumns.backlog],
+      unstarted: [...derivedColumns.unstarted],
+      started: [...derivedColumns.started],
+      completed: [...derivedColumns.completed],
+      cancelled: [...derivedColumns.cancelled],
+    };
+
+    let targetGroup: Group = fromGroup;
+    let targetIndex = base[fromGroup].length;
+    if (GROUPS.includes(overId as Group)) {
+      targetGroup = overId as Group;
+      targetIndex = base[targetGroup].length;
+    } else {
+      for (const g of GROUPS) {
+        const idx = base[g].findIndex((i) => i.id === overId);
+        if (idx >= 0) { targetGroup = g; targetIndex = idx; break; }
+      }
+    }
+
+    // Remove the moved item from its origin, then recompute the target index
+    // (the over item may have shifted after removal within the same column).
+    base[fromGroup] = base[fromGroup].filter((i) => i.id !== movedId);
+    if (fromGroup === targetGroup && !GROUPS.includes(overId as Group)) {
+      const overIdx = base[targetGroup].findIndex((i) => i.id === overId);
+      targetIndex = overIdx >= 0 ? overIdx : base[targetGroup].length;
+    }
+    base[targetGroup].splice(targetIndex, 0, movedIssue);
+
+    const targetItems = base[targetGroup];
+    const newOrder = targetItems.map((i, idx) => ({ id: i.id, sort_order: idx * 10 }));
+    const orderMap = Object.fromEntries(newOrder.map((o) => [o.id, o.sort_order]));
+    const targetState = states.find((s) => s.group_name === targetGroup) || null;
+    const stateChanged = !!targetState && fromGroup !== targetGroup;
+    const orderChanged = newOrder.some((o) => issues.find((i) => i.id === o.id)?.sort_order !== o.sort_order);
+
+    setColumns(base);
+    if (!stateChanged && !orderChanged) return;
+
+    const prevIssues = issues;
+    setIssues((prev) => prev.map((i) => {
+      if (i.id === movedId && targetState) {
+        return { ...i, state: { id: targetState.id, name: targetState.name, group_name: targetState.group_name, color: targetState.color }, sort_order: orderMap[i.id] ?? i.sort_order };
+      }
+      if (orderMap[i.id] !== undefined) return { ...i, sort_order: orderMap[i.id] };
+      return i;
+    }));
+
+    try {
+      if (stateChanged && targetState) {
+        const r = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${movedId}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders },
+          body: JSON.stringify({ state_id: targetState.id }),
+        });
+        const j = await r.json();
+        if (!j.success) throw new Error(j.error);
+      }
+      const r = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues/reorder`, {
+        method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({ items: newOrder }),
+      });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error);
+    } catch {
+      setIssues(prevIssues); // rollback (re-derives columns)
+    }
+  }
+
+  const activeIssue = activeId ? issues.find((i) => i.id === activeId) : null;
+  const activeGroup = activeId ? groupOf(activeId) : null;
+  const activeStateColor = activeGroup ? states.find((s) => s.group_name === activeGroup)?.color : undefined;
 
   if (loading) return (
     <div className="flex h-full items-center justify-center">
@@ -162,9 +294,7 @@ export default function IssuesPage() {
 
   if (wsSlug && projects.length === 0) return (
     <div className="empty-state">
-      <div className="empty-state-icon">
-        <TasksIcon />
-      </div>
+      <div className="empty-state-icon"><TasksIcon /></div>
       <p className="empty-state-title">No project access yet</p>
       <p className="empty-state-desc">A manager needs to add you to a project before you can see its board.</p>
     </div>
@@ -186,8 +316,8 @@ export default function IssuesPage() {
           )}
         </div>
         <div className="flex gap-2 flex-shrink-0">
-          <button onClick={() => setShowProj(true)} className="btn-secondary btn-sm">+ Project</button>
-          <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">+ New Task</button>
+          <Button variant="secondary" size="sm" onClick={() => setShowProj(true)}>+ Project</Button>
+          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>+ New Task</Button>
         </div>
       </div>
 
@@ -199,7 +329,7 @@ export default function IssuesPage() {
         </select>
         <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="select text-xs w-auto min-w-[120px]">
           <option value="">All priorities</option>
-          {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+          {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_META[p].label}</option>)}
         </select>
         <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="select text-xs w-auto min-w-[140px]">
           <option value="">All members</option>
@@ -209,85 +339,36 @@ export default function IssuesPage() {
           className="input-sm w-auto min-w-[200px]" />
       </div>
 
-      {/* Kanban — horizontal scroll on tablet, stack on mobile */}
-      <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory md:grid md:grid-cols-5">
-        {["backlog", "unstarted", "started", "completed", "cancelled"].map(group => {
-          const cols = groupByState(group);
-          const items = cols[group] || [];
-          const stateInfo = states.find(s => s.group_name === group);
-          const isOver = dragOverGroup === group;
-          const droppable = !!states.find(s => s.group_name === group);
-          return (
-            <div key={group}
-              onDragOver={e => { if (droppable) { e.preventDefault(); setDragOverGroup(group); } }}
-              onDragLeave={() => setDragOverGroup(g => g === group ? null : g)}
-              onDrop={() => { if (dragId) moveIssueToGroup(dragId, group); setDragId(null); setDragOverGroup(null); }}
-              className={`min-w-[260px] snap-start rounded-xl p-3 transition-all duration-200 ${isOver ? "bg-primary-50 ring-2 ring-primary-300" : "bg-surface-2"}`}>
-              <div className="flex items-center justify-between mb-3 px-1">
-                <div className="flex items-center gap-2">
-                  <span className="size-2 rounded-full" style={{ backgroundColor: stateInfo?.color }} />
-                  <span className="text-xs font-semibold text-text-secondary">{stateInfo?.name || group}</span>
-                </div>
-                <span className="text-xs font-medium text-text-tertiary px-1.5 py-0.5 rounded-full bg-white/50">{items.length}</span>
-              </div>
-              <div className="space-y-2 min-h-[60px]">
-                {items.map(issue => {
-                  const prio = PRIO_META[issue.priority] || PRIO_META.none;
-                  return (
-                    <div key={issue.id} draggable
-                      onDragStart={() => setDragId(issue.id)}
-                      onDragEnd={() => { setDragId(null); setDragOverGroup(null); }}
-                      onClick={() => setSelectedIssue(issue.id)}
-                      className={`card p-3 cursor-grab active:cursor-grabbing transition-all duration-150
-                        hover:shadow-elevated hover:-translate-y-0.5
-                        ${dragId === issue.id ? "opacity-50 ring-2 ring-primary-300" : ""}
-                        border-l-[3px]`}
-                      style={{ borderLeftColor: stateInfo?.color || "#E2E8F0" }}>
-                      <p className="text-sm font-semibold text-text-primary mb-2.5 line-clamp-2 leading-snug">
-                        {issue.is_bug && <BugIcon className="inline mr-1 -mt-0.5 text-red-500" />}
-                        {issue.name}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md`}
-                          style={{ backgroundColor: prio.bg, color: prio.color }}>
-                          {prio.label}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          {!!issue.subtask_total && (
-                            <span className="text-[10px] text-text-tertiary font-medium">
-                              {issue.subtask_done}/{issue.subtask_total}
-                            </span>
-                          )}
-                          {issue.assignees?.length > 0 && (
-                            <div className="avatar-group">
-                              {issue.assignees.slice(0, 2).map((a, i) => (
-                                <div key={i} className="avatar size-5 text-[8px] bg-primary-100 text-primary-700 font-bold ring-2 ring-white">
-                                  {a.display_name?.[0]?.toUpperCase() || "?"}
-                                </div>
-                              ))}
-                              {issue.assignees.length > 2 && (
-                                <div className="avatar size-5 text-[8px] bg-surface-2 text-text-tertiary font-medium ring-2 ring-white">
-                                  +{issue.assignees.length - 2}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {items.length === 0 && (
-                  <div className={`text-xs text-text-tertiary text-center py-6 rounded-lg border-2 border-dashed transition-colors
-                    ${isOver ? "border-primary-300 bg-primary-50/50 text-primary" : "border-border"}`}>
-                    {isOver ? "Drop here" : "No tasks"}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* Kanban board */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory md:grid md:grid-cols-5">
+          {GROUPS.map((group) => {
+            const stateInfo = states.find(s => s.group_name === group);
+            const droppable = !!stateInfo;
+            return (
+              <KanbanColumn
+                key={group}
+                group={group}
+                items={columns[group]}
+                stateInfo={stateInfo}
+                droppable={droppable}
+                activeId={activeId}
+                onOpen={setSelectedIssue}
+              />
+            );
+          })}
+        </div>
+        <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.18,0.67,0.6,1.22)" }}>
+          {activeIssue ? <DragPreviewCard issue={activeIssue} stateColor={activeStateColor} /> : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -312,77 +393,61 @@ export default function IssuesPage() {
       )}
 
       {/* Create project modal */}
-      {showProj && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowProj(false)}>
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-modal w-full sm:max-w-md animate-slide-up p-5 sm:p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h2 className="font-bold text-lg text-text-primary mb-1">New Project</h2>
-            <p className="text-sm text-text-secondary mb-4">Create a new project to organize tasks.</p>
-            <div className="space-y-3">
-              <input value={newProjName} onChange={e => setNewProjName(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && createProject()} placeholder="Project name"
-                className="input" autoFocus />
-              <p className="text-xs text-text-tertiary">Code: <span className="font-mono font-medium text-text-secondary">{deriveIdentifier(newProjName.trim() || "General")}</span></p>
-            </div>
-            <div className="flex justify-end gap-2 mt-6">
-              <button onClick={() => setShowProj(false)} className="btn-secondary btn-sm">Cancel</button>
-              <button onClick={createProject} className="btn-primary btn-sm">Create</button>
-            </div>
-          </div>
+      <Modal open={showProj} onClose={() => setShowProj(false)} title="New Project" description="Create a new project to organize tasks."
+        footer={<>
+          <Button variant="secondary" size="sm" onClick={() => setShowProj(false)}>Cancel</Button>
+          <Button variant="primary" size="sm" onClick={createProject}>Create</Button>
+        </>}>
+        <div className="space-y-3">
+          <Input value={newProjName} onChange={e => setNewProjName(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && createProject()} placeholder="Project name" autoFocus />
+          <p className="text-xs text-text-tertiary">Code: <span className="font-mono font-medium text-text-secondary">{deriveIdentifier(newProjName.trim() || "General")}</span></p>
         </div>
-      )}
+      </Modal>
 
       {/* Create issue modal */}
-      {showCreate && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowCreate(false)}>
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-modal w-full sm:max-w-lg animate-slide-up p-5 sm:p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h2 className="font-bold text-lg text-text-primary mb-1">Create Task</h2>
-            <p className="text-sm text-text-secondary mb-4">Add a new task to the current project.</p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1.5">Task name</label>
-                <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Fix login redirect"
-                  className="input" autoFocus onKeyDown={e => e.key === "Enter" && createIssue()} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">Priority</label>
-                  <select value={newPriority} onChange={e => setNewPriority(e.target.value)} className="select">
-                    {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-text-secondary mb-1.5">Type</label>
-                  <label className="flex items-center gap-2 h-full text-sm text-text-secondary cursor-pointer">
-                    <input type="checkbox" checked={newBug} onChange={e => setNewBug(e.target.checked)}
-                      className="rounded border-border text-primary focus:ring-primary-200" />
-                    <BugIcon /> Mark as bug
-                  </label>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1.5">Assignees</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {members.length === 0 && <p className="text-xs text-text-tertiary">No members yet.</p>}
-                  {members.map(m => {
-                    const on = newAssigneeIds.includes(m.user_id);
-                    return (
-                      <button key={m.user_id} type="button" onClick={() => toggleNewAssignee(m.user_id)}
-                        className={`text-xs px-2.5 py-1.5 rounded-full border transition-all
-                          ${on ? "bg-primary-50 border-primary-300 text-primary font-medium" : "border-border text-text-secondary hover:bg-surface-2"}`}>
-                        {m.profile?.display_name || m.user_id.slice(0, 6)}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create Task" description="Add a new task to the current project." maxWidth="sm:max-w-lg"
+        footer={<>
+          <Button variant="secondary" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+          <Button variant="primary" size="sm" onClick={createIssue}>Create</Button>
+        </>}>
+        <div className="space-y-4">
+          <Input label="Task name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Fix login redirect"
+            autoFocus onKeyDown={e => e.key === "Enter" && createIssue()} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">Priority</label>
+              <select value={newPriority} onChange={e => setNewPriority(e.target.value)} className="select">
+                {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_META[p].label}</option>)}
+              </select>
             </div>
-            <div className="flex justify-end gap-2 mt-6">
-              <button onClick={() => setShowCreate(false)} className="btn-secondary btn-sm">Cancel</button>
-              <button onClick={createIssue} className="btn-primary btn-sm">Create</button>
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1.5">Type</label>
+              <label className="flex items-center gap-2 h-[38px] text-sm text-text-secondary cursor-pointer">
+                <input type="checkbox" checked={newBug} onChange={e => setNewBug(e.target.checked)}
+                  className="rounded border-border text-primary focus:ring-primary-200" />
+                Mark as bug
+              </label>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1.5">Assignees</label>
+            <div className="flex flex-wrap gap-1.5">
+              {members.length === 0 && <p className="text-xs text-text-tertiary">No members yet.</p>}
+              {members.map(m => {
+                const on = newAssigneeIds.includes(m.user_id);
+                return (
+                  <button key={m.user_id} type="button" onClick={() => toggleNewAssignee(m.user_id)}
+                    className={`text-xs px-2.5 py-1.5 rounded-full border transition-all
+                      ${on ? "bg-primary-50 border-primary-300 text-primary font-medium dark:bg-primary-500/15 dark:border-primary-500/40" : "border-border text-text-secondary hover:bg-surface-2"}`}>
+                    {m.profile?.display_name || m.user_id.slice(0, 6)}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
-      )}
+      </Modal>
 
       {/* Slide-over panel */}
       {selectedIssue && (
@@ -399,17 +464,5 @@ export default function IssuesPage() {
         />
       )}
     </div>
-  );
-}
-
-// Re-export icon for the empty state
-function TasksIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
   );
 }

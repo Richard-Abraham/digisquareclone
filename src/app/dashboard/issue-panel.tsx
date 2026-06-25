@@ -140,7 +140,7 @@ export default function IssuePanel({ issueId, wsSlug, projId, members, states, o
       <div className="fixed inset-0 bg-black/20 z-50 hidden lg:block" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full sm:max-w-lg bg-white shadow-[-4px_0_20px_rgba(0,0,0,0.08)] flex flex-col animate-slide-in-right">
+      <div className="fixed inset-y-0 right-0 z-50 w-full sm:max-w-lg bg-surface-1 border-l border-border shadow-[-4px_0_20px_rgba(0,0,0,0.08)] flex flex-col animate-slide-in-right">
         {/* Header */}
         <div className="flex items-center justify-between px-5 h-14 border-b border-border-subtle flex-shrink-0">
           <div className="flex items-center gap-2">
@@ -257,7 +257,7 @@ export default function IssuePanel({ issueId, wsSlug, projId, members, states, o
                   <input value={depSearch} onChange={(e) => setDepSearch(e.target.value)} placeholder="Link a task..."
                     className="input-sm w-full text-xs" />
                   {depResults.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg border border-border shadow-elevated z-10 max-h-32 overflow-y-auto">
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-surface-1 rounded-lg border border-border shadow-elevated z-10 max-h-32 overflow-y-auto">
                       {depResults.map((r: any) => (
                         <button key={r.id} onClick={() => addDep(r.id)} disabled={depBusy}
                           className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-muted truncate">
