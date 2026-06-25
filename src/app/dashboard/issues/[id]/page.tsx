@@ -4,6 +4,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { BugIcon, CheckIcon, CloseIcon } from "@/components/icons";
+import { PRIO_META } from "@/lib/tasks";
 
 interface Dep { id: string; name: string; sequence_id: number; state: { name: string; color: string } | null }
 interface TimeEntry { id: string; started_at: string; ended_at: string | null; }
@@ -19,13 +20,7 @@ interface ActivityEvent { id: string; kind: string; created_at: string; snippet:
 interface DetailBundle { issue: Issue; states: State[]; members: Member[]; tags: Tag[]; subtasks: SubTask[]; comments: Comment[]; reviewers: Reviewer[]; activity: ActivityEvent[]; me: { id: string }; }
 
 const PRIORITIES = ["urgent", "high", "medium", "low", "none"] as const;
-const PRIO_META: Record<string, { label: string; color: string; bg: string }> = {
-  urgent: { label: "Urgent", color: "#DC2626", bg: "#FEF2F2" },
-  high: { label: "High", color: "#D97706", bg: "#FFFBEB" },
-  medium: { label: "Medium", color: "#6366F1", bg: "#EEF2FF" },
-  low: { label: "Low", color: "#64748B", bg: "#F1F5F9" },
-  none: { label: "None", color: "#CBD5E1", bg: "#F8FAFC" },
-};
+
 const REVIEW_LABEL: Record<string, string> = { pending: "Pending", approved: "Approved", changes_requested: "Changes requested", declined: "Declined" };
 const REVIEW_COLOR: Record<string, string> = { pending: "#D97706", approved: "#10B981", changes_requested: "#DC2626", declined: "#94A3B8" };
 

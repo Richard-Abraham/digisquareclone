@@ -14,7 +14,7 @@ against the live code and report mismatches as a STOP condition.
 | Plan | Title | Priority | Effort | Risk | Depends on | Status |
 |------|-------|----------|--------|------|------------|--------|
 | 001 | Remove empty experimental key and unused CSS class | P3 | S | LOW | — | DONE |
-| 002 | Deduplicate PRIO_META constant into lib/tasks.ts | P2 | S | LOW | — | TODO |
+| 002 | Deduplicate PRIO_META constant into lib/tasks.ts | P2 | S | LOW | — | DONE |
 | 003 | Simplify pagination in dashboard page | P3 | S | LOW | — | TODO |
 | 004 | Extract shared timer and dependency hooks | P2 | M | MED | — | TODO |
 | 005 | Remove unused @tanstack/react-query dependency | P1 | S | LOW | — | TODO |

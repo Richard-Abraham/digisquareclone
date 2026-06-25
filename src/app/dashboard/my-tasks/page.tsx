@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { BugIcon } from "@/components/icons";
+import { PRIO_META } from "@/lib/tasks";
 
 interface Task {
   id: string; name: string; priority: string; sequence_id: number; is_bug: boolean;
@@ -19,14 +20,6 @@ const VIEWS = [
   { key: "bugs", label: "Bugs" },
   { key: "done", label: "Done" },
 ];
-
-const PRIO_META: Record<string, { color: string; bg: string }> = {
-  urgent: { color: "#DC2626", bg: "#FEF2F2" },
-  high: { color: "#D97706", bg: "#FFFBEB" },
-  medium: { color: "#6366F1", bg: "#EEF2FF" },
-  low: { color: "#64748B", bg: "#F1F5F9" },
-  none: { color: "#CBD5E1", bg: "#F8FAFC" },
-};
 
 export default function MyTasksPage() {
   const router = useRouter();

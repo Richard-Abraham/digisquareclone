@@ -7,6 +7,17 @@ export type ReviewerState = "pending" | "approved" | "changes_requested" | "decl
 export const STATE_GROUPS = ["backlog", "unstarted", "started", "completed", "cancelled"] as const;
 export type StateGroup = (typeof STATE_GROUPS)[number];
 
+/** Display metadata for priority levels — label, Tailwind-like color hex, and background hex. */
+export type PriorityMeta = { label: string; color: string; bg: string };
+
+export const PRIO_META: Record<string, PriorityMeta> = {
+  urgent: { label: "Urgent", color: "#DC2626", bg: "#FEF2F2" },
+  high: { label: "High", color: "#D97706", bg: "#FFFBEB" },
+  medium: { label: "Medium", color: "#6366F1", bg: "#EEF2FF" },
+  low: { label: "Low", color: "#64748B", bg: "#F1F5F9" },
+  none: { label: "None", color: "#CBD5E1", bg: "#F8FAFC" },
+};
+
 /** A state group is "done-like" when finishing a task should count as completing it. */
 export function isCompletedGroup(group: string | null | undefined): boolean {
   return group === "completed";

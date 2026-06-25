@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/providers";
-import { deriveIdentifier } from "@/lib/tasks";
+import { deriveIdentifier, PRIO_META } from "@/lib/tasks";
 import { BugIcon } from "@/components/icons";
 import IssuePanel from "./issue-panel";
 
@@ -11,13 +11,6 @@ interface State { id: string; name: string; group_name: string; color: string; }
 interface Member { user_id: string; profile: { display_name: string } | null; }
 
 const PRIORITIES = ["urgent", "high", "medium", "low", "none"] as const;
-const PRIO_META: Record<string, { label: string; color: string; bg: string }> = {
-  urgent: { label: "Urgent", color: "#DC2626", bg: "#FEF2F2" },
-  high: { label: "High", color: "#D97706", bg: "#FFFBEB" },
-  medium: { label: "Medium", color: "#6366F1", bg: "#EEF2FF" },
-  low: { label: "Low", color: "#64748B", bg: "#F1F5F9" },
-  none: { label: "None", color: "#CBD5E1", bg: "#F8FAFC" },
-};
 
 const PAGE_SIZE = 50;
 

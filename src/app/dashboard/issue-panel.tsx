@@ -3,20 +3,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, getToken } from "@/lib/api";
 import { BugIcon, CheckIcon, CloseIcon } from "@/components/icons";
+import { PRIO_META } from "@/lib/tasks";
 
 interface Issue { id: string; name: string; priority: string; sequence_id: number; state_id: string; is_bug: boolean; target_date: string | null; created_at: string; created_by: string; creator: { display_name?: string } | null; state: { id: string; name: string; group_name: string; color: string } | null; assignees: { user_id?: string; display_name?: string }[]; }
 interface State { id: string; name: string; group_name: string; color: string; }
 interface Member { user_id: string; profile: { display_name: string } | null; }
 interface Dep { id: string; name: string; sequence_id: number; state: { name: string; group_name: string; color: string } | null }
 interface TimeLog { id: string; started_at: string; ended_at: string | null; }
-
-const PRIO_META: Record<string, { label: string; color: string; bg: string }> = {
-  urgent: { label: "Urgent", color: "#DC2626", bg: "#FEF2F2" },
-  high: { label: "High", color: "#D97706", bg: "#FFFBEB" },
-  medium: { label: "Medium", color: "#6366F1", bg: "#EEF2FF" },
-  low: { label: "Low", color: "#64748B", bg: "#F1F5F9" },
-  none: { label: "None", color: "#CBD5E1", bg: "#F8FAFC" },
-};
 
 function fmtDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
