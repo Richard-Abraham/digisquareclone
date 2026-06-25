@@ -23,21 +23,49 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get("pageSize") || "50", 10)));
   const offset = (page - 1) * pageSize;
 
+  // Pre-resolve filters that need junction tables so they apply BEFORE pagination.
+  // C4 fix: tag filter was applied after pagination, breaking counts and paging.
+  // C5 fix: assignee filter only matched primary assignee, missing multi-assignee issues.
+  const preFilterIds = new Set<string | null>([null]); // null = no pre-filter
+  let preFilterIntersection: Set<string> | null = null;
+
+  if (tag) {
+    const { data: tagRows } = await getAdmin().from("issue_tags").select("issue_id").eq("tag_id", tag);
+    const ids = new Set((tagRows || []).map((r: any) => r.issue_id as string));
+    preFilterIntersection = ids;
+  }
+
+  if (assignee) {
+    // Fetch issue_ids where the user is a multi-assignee (issue_assignees).
+    const { data: assigneeRows } = await getAdmin().from("issue_assignees").select("issue_id").eq("user_id", assignee);
+    const multiIds = new Set((assigneeRows || []).map((r: any) => r.issue_id as string));
+    if (preFilterIntersection) {
+      // Intersect with existing pre-filter
+      for (const id of Array.from(preFilterIntersection)) if (!multiIds.has(id)) preFilterIntersection.delete(id);
+    } else {
+      preFilterIntersection = multiIds;
+    }
+  }
+
   let q = getAdmin().from("issues").select(
     "*, state:states(*), assignees:issue_assignees(user_id), tags:issue_tags(tag_id), subtasks:issue_subtasks(done), reviewers:issue_reviewers(user_id, state)",
     { count: "exact" }
   ).eq("project_id", params.projectId).is("archived_at", null).eq("is_draft", false).order("sort_order").order("sequence_id", { ascending: false }).range(offset, offset + pageSize - 1);
   if (state) q = q.eq("state_id", state);
   if (priority) q = q.eq("priority", priority);
-  if (assignee) q = q.eq("assignee_id", assignee);
   if (search) q = q.ilike("name", `%${search}%`);
   if (bugs === "true") q = q.eq("is_bug", true);
+  // Apply junction-table filters via .in() so they participate in count + pagination.
+  if (preFilterIntersection !== null) {
+    const ids = Array.from(preFilterIntersection);
+    if (ids.length === 0) return ok({ issues: [], total: 0, page, pageSize });
+    q = q.in("id", ids);
+  }
 
   const { data, count, error: qe } = await q;
   if (qe) return err(qe.message, 500);
 
   let rows = data || [];
-  if (tag) rows = rows.filter((i: any) => (i.tags || []).some((t: any) => t.tag_id === tag));
 
   // Enrich assignees (multi) + primary assignee + creator with profiles.
   const userIds = Array.from(new Set(rows.flatMap((i: any) => [

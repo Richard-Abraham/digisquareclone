@@ -38,9 +38,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   if (!before) return err("Not found", 404);
   const fromGroup = (before as any).state?.group_name ?? null;
 
-  // Only persist known issue columns (callers may send tag_ids/assignee_ids handled elsewhere).
+  // Allowlist of columns the PATCH may update — prevents mass-assignment of
+  // protected fields like workspace_id, project_id, created_by, archived_at, etc.
+  const ALLOWED_COLUMNS = new Set([
+    "name", "description_html", "priority", "state_id", "assignee_id",
+    "is_bug", "is_draft", "start_date", "target_date", "parent_id", "sort_order",
+  ]);
   const { assignee_ids, reviewer_ids, tag_ids, ...rest } = body;
-  const updates: Record<string, unknown> = { ...rest, updated_by: user.id };
+  const updates: Record<string, unknown> = { updated_by: user.id };
+  for (const [key, value] of Object.entries(rest)) {
+    if (ALLOWED_COLUMNS.has(key)) updates[key] = value;
+  }
 
   let toGroup = fromGroup;
   if (body.state_id) {

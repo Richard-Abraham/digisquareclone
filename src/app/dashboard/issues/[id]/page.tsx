@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -29,7 +29,7 @@ const PRIO_META: Record<string, { label: string; color: string; bg: string }> = 
 const REVIEW_LABEL: Record<string, string> = { pending: "Pending", approved: "Approved", changes_requested: "Changes requested", declined: "Declined" };
 const REVIEW_COLOR: Record<string, string> = { pending: "#D97706", approved: "#10B981", changes_requested: "#DC2626", declined: "#94A3B8" };
 
-export default function IssueDetailPage() {
+function IssueDetailPageContent() {
   const params = useParams(); const searchParams = useSearchParams(); const router = useRouter();
   const issueId = params.id as string;
   const wsSlug = searchParams.get("ws") || "";
@@ -56,7 +56,11 @@ export default function IssueDetailPage() {
   const [depResults, setDepResults] = useState<Dep[]>([]);
 
   const { issue, states, members, tags, subtasks, comments, reviewers, activity, me } = bundle || {};
-  if (typeof window !== "undefined" && !localStorage.getItem("token")) { router.push("/login"); return null as any; }
+
+  // M5 fix: move auth check to useEffect (was router.push during render — React anti-pattern).
+  useEffect(() => {
+    if (typeof window !== "undefined" && !localStorage.getItem("token")) router.push("/login");
+  }, [router]);
 
   const loadData = useCallback(async () => {
     const b = await api<DetailBundle>(detailUrl);
@@ -340,7 +344,7 @@ export default function IssueDetailPage() {
               <input type="checkbox" checked={s.done} onChange={() => toggleSub(s)}
                 className="rounded border-border text-primary focus:ring-primary-200 size-4" />
               <span className={`flex-1 ${s.done ? "line-through text-text-tertiary" : "text-text-primary"}`}>{s.title}</span>
-              <button onClick={() => deleteSub(s.id)} className="text-text-tertiary opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all">
+              <button onClick={() => deleteSub(s.id)} className="text-text-tertiary opacity-60 hover:opacity-100 hover:text-red-500 transition-opacity" aria-label="Delete subtask">
                 <CloseIcon size={14} />
               </button>
             </div>
@@ -398,5 +402,14 @@ export default function IssueDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// M5 fix: useSearchParams requires a Suspense boundary in Next 14 App Router.
+export default function IssueDetailPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-600 animate-pulse-soft" /></div>}>
+      <IssueDetailPageContent />
+    </Suspense>
   );
 }

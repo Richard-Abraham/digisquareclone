@@ -31,15 +31,19 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
-  const { data: ws } = await getAdmin().from("workspaces").select("id").eq("slug", params.slug).single();
-  if (!ws) return err("Workspace not found", 404);
+  const access = await getWorkspaceAccess(params.slug, user.id);
+  if (!access) return err("Access denied", 403);
+  const wsId = access.workspace.id;
   const { name, identifier } = await req.json() as { name?: string; identifier?: string };
   if (!name?.trim()) return err("Name required");
   // Identifier is optional now — auto-derive from the name and make it workspace-unique.
-  const code = await ensureUniqueIdentifier(ws.id, identifier?.trim() || deriveIdentifier(name));
-  const { data: proj, error: pe } = await getAdmin().from("projects").insert({ name, identifier: code, workspace_id: ws.id }).select().single();
+  const code = await ensureUniqueIdentifier(wsId, identifier?.trim() || deriveIdentifier(name));
+  const { data: proj, error: pe } = await getAdmin().from("projects").insert({ name, identifier: code, workspace_id: wsId }).select().single();
   if (pe) return err(pe.message, 400);
-  for (const s of DEF_STATES) await getAdmin().from("states").insert({ project_id: proj.id, workspace_id: ws.id, name: s.name, color: s.color, group_name: s.group, sequence: s.seq, is_default: s.group === "unstarted" });
+  // Batch-insert all default states in a single query instead of N sequential awaits.
+  await getAdmin().from("states").insert(
+    DEF_STATES.map(s => ({ project_id: proj.id, workspace_id: wsId, name: s.name, color: s.color, group_name: s.group, sequence: s.seq, is_default: s.group === "unstarted" }))
+  );
   await getAdmin().from("project_members").insert({ project_id: proj.id, user_id: user.id, role: 10 });
   return ok(proj, 201);
 }

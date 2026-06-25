@@ -38,17 +38,28 @@ export interface ProjectAccess {
 
 /** Resolve a project's workspace and assert the user can work in it: workspace
  *  managers/the owner always can; other workspace members need an explicit
- *  project_members row. Returns null if the user has no access at all. */
+ *  project_members row. Returns null if the user has no access at all.
+ *  Uses an embedded join to fetch project + workspace in one query (was 3-4). */
 export async function getProjectAccess(projectId: string, userId: string): Promise<ProjectAccess | null> {
-  const { data: project } = await getAdmin().from("projects").select("workspace_id").eq("id", projectId).single();
-  if (!project) return null;
-  const { data: ws } = await getAdmin().from("workspaces").select("id, owner_id").eq("id", project.workspace_id).single();
+  // 1 query: project + its workspace via embedded select.
+  const { data: proj } = await getAdmin()
+    .from("projects")
+    .select("id, workspace_id, workspace:workspaces(id, owner_id)")
+    .eq("id", projectId)
+    .single() as any;
+  if (!proj) return null;
+  const ws = proj.workspace;
   if (!ws) return null;
-  const { data: m } = await getAdmin().from("workspace_members").select("role").eq("workspace_id", ws.id).eq("user_id", userId).single();
+
+  // 2nd query: workspace membership for this user.
+  const { data: m } = await getAdmin()
+    .from("workspace_members").select("role").eq("workspace_id", ws.id).eq("user_id", userId).single();
   const isOwner = ws.owner_id === userId;
   if (!m && !isOwner) return null;
   const manager = isManager({ isOwner, role: m?.role ?? null });
   if (manager) return { workspaceId: ws.id, isManager: true };
+
+  // 3rd query (only for non-managers): project membership.
   const { data: pm } = await getAdmin().from("project_members").select("user_id").eq("project_id", projectId).eq("user_id", userId).maybeSingle();
   if (!pm) return null;
   return { workspaceId: ws.id, isManager: false };
@@ -79,9 +90,10 @@ export async function createDefaultProject(workspaceId: string, userId: string, 
   const { data: proj } = await getAdmin().from("projects")
     .insert({ name, identifier: code, workspace_id: workspaceId }).select().single();
   if (!proj) return null;
-  for (const s of DEFAULT_STATES) {
-    await getAdmin().from("states").insert({ project_id: proj.id, workspace_id: workspaceId, name: s.name, color: s.color, group_name: s.group, sequence: s.seq, is_default: s.group === "unstarted" });
-  }
+  // Batch-insert all default states in a single query.
+  await getAdmin().from("states").insert(
+    DEFAULT_STATES.map(s => ({ project_id: proj.id, workspace_id: workspaceId, name: s.name, color: s.color, group_name: s.group, sequence: s.seq, is_default: s.group === "unstarted" }))
+  );
   await getAdmin().from("project_members").insert({ project_id: proj.id, user_id: userId, role: 10 });
   return proj;
 }

@@ -26,12 +26,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const token = getToken();
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
-    const refresh = () => fetch("/api/notifications", { headers })
-      .then(r => r.json()).then(j => { if (j.success) setUnread(j.data.unread); }).catch(() => {});
+    let cancelled = false;
+    const refresh = () => {
+      if (cancelled) return;
+      fetch("/api/notifications", { headers })
+        .then(r => r.json()).then(j => { if (!cancelled && j.success) setUnread(j.data.unread); }).catch(() => {});
+    };
     refresh();
     const t = setInterval(refresh, 30000);
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
-    return () => clearInterval(t);
+    const onVisible = () => { if (!document.hidden && !cancelled) refresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [ready, user]);
 
   // Close sidebar on navigation

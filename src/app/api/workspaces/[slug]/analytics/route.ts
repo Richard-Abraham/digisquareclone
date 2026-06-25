@@ -2,16 +2,18 @@ import { NextRequest } from "next/server";
 import { getAdmin } from "@/lib/supabase";
 import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
+import { getWorkspaceAccess } from "@/lib/access";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
-  const { data: ws } = await getAdmin().from("workspaces").select("id").eq("slug", params.slug).single();
-  if (!ws) return err("Not found", 404);
+  const access = await getWorkspaceAccess(params.slug, user.id);
+  if (!access) return err("Access denied", 403);
+  const wsId = access.workspace.id;
 
   const tab = new URL(req.url).searchParams.get("tab") || "overview";
-  if (tab === "work-items") return ok(await workItemsStats(ws.id));
-  return ok(await overviewStats(ws.id));
+  if (tab === "work-items") return ok(await workItemsStats(wsId));
+  return ok(await overviewStats(wsId));
 }
 
 async function overviewStats(wsId: string) {

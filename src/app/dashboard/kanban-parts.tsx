@@ -76,6 +76,7 @@ export function KanbanCard({ issue, stateColor, onOpen }: KanbanCardProps) {
     transform: CSS.Transform.toString(transform),
     transition,
     borderLeftColor: stateColor || "#E2E8F0",
+    touchAction: "none",
   };
   return (
     <div

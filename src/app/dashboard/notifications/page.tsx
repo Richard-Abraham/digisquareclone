@@ -25,13 +25,21 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined" && !localStorage.getItem("token")) { router.push("/login"); return; }
+    let cancelled = false;
     (async () => {
       try {
         const res = await api<{ items: Notif[]; unread: number }>("/api/notifications");
+        if (cancelled) return;
         setItems(res.items);
-        if (res.unread > 0) await api("/api/notifications/read", { method: "POST", body: {} });
-      } finally { setLoading(false); }
+        // M9 fix: mark all read server-side AND update local UI so dots disappear immediately.
+        if (res.unread > 0) {
+          const now = new Date().toISOString();
+          setItems(prev => prev.map(n => ({ ...n, read_at: n.read_at ?? now })));
+          await api("/api/notifications/read", { method: "POST", body: {} });
+        }
+      } finally { if (!cancelled) setLoading(false); }
     })();
+    return () => { cancelled = true; };
   }, [router]);
 
   function linkFor(n: Notif) {

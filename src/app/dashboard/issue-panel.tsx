@@ -63,6 +63,17 @@ export default function IssuePanel({ issueId, wsSlug, projId, members, states, o
     loadDeps();
   }, [issueId]);
 
+  // M2 fix: Escape to close + body scroll lock while panel is open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
   async function loadIssue() {
     try {
       const b = await api<any>(`${base}/detail`);
@@ -136,11 +147,16 @@ export default function IssuePanel({ issueId, wsSlug, projId, members, states, o
 
   return (
     <>
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-black/20 z-50 hidden lg:block" onClick={onClose} />
+      {/* Overlay — visible on all viewports so mobile users can tap outside to close */}
+      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full sm:max-w-lg bg-surface-1 border-l border-border shadow-[-4px_0_20px_rgba(0,0,0,0.08)] flex flex-col animate-slide-in-right">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Issue #${issue?.sequence_id || ""}`}
+        className="fixed inset-y-0 right-0 z-50 w-full sm:max-w-lg bg-surface-1 border-l border-border shadow-[-4px_0_20px_rgba(0,0,0,0.08)] flex flex-col animate-slide-in-right"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 h-14 border-b border-border-subtle flex-shrink-0">
           <div className="flex items-center gap-2">
@@ -150,7 +166,7 @@ export default function IssuePanel({ issueId, wsSlug, projId, members, states, o
           <div className="flex items-center gap-1">
             <button onClick={() => router.push(`/dashboard/issues/${issueId}?ws=${wsSlug}&proj=${projId}`)}
               className="btn-ghost btn-sm text-xs">Full page &rarr;</button>
-            <button onClick={onClose} className="btn-ghost btn-icon btn-sm"><CloseIcon size={16} /></button>
+            <button onClick={onClose} className="btn-ghost btn-icon btn-sm" aria-label="Close panel"><CloseIcon size={16} /></button>
           </div>
         </div>
 
@@ -227,7 +243,7 @@ export default function IssuePanel({ issueId, wsSlug, projId, members, states, o
                         <div key={d.id} className="flex items-center gap-2 text-sm group">
                           <span className="size-1.5 rounded-full" style={{ backgroundColor: d.state?.color }} />
                           <span className="flex-1 truncate text-text-primary font-medium">{d.name}</span>
-                          <button onClick={() => removeDep(d.id)} className="text-text-tertiary opacity-0 group-hover:opacity-100 hover:text-red-500"><CloseIcon size={12} /></button>
+                          <button onClick={() => removeDep(d.id)} className="text-text-tertiary opacity-60 hover:opacity-100 hover:text-red-500 transition-opacity" aria-label="Remove dependency"><CloseIcon size={12} /></button>
                         </div>
                       ))}
                     </div>
@@ -242,7 +258,7 @@ export default function IssuePanel({ issueId, wsSlug, projId, members, states, o
                         <div key={d.id} className="flex items-center gap-2 text-sm group">
                           <span className="size-1.5 rounded-full" style={{ backgroundColor: d.state?.color }} />
                           <span className="flex-1 truncate text-text-primary font-medium">{d.name}</span>
-                          <button onClick={() => removeDep(d.id)} className="text-text-tertiary opacity-0 group-hover:opacity-100 hover:text-red-500"><CloseIcon size={12} /></button>
+                          <button onClick={() => removeDep(d.id)} className="text-text-tertiary opacity-60 hover:opacity-100 hover:text-red-500 transition-opacity" aria-label="Remove dependency"><CloseIcon size={12} /></button>
                         </div>
                       ))}
                     </div>

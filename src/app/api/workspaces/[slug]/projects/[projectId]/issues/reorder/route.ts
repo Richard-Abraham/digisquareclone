@@ -12,17 +12,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
   if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
 
   const body = await req.json() as { items?: { id: string; sort_order: number }[] };
-  const items = body.items;
-  if (!Array.isArray(items) || items.length === 0) return err("items required");
+  const items = (body.items || []).filter((it) => it?.id && typeof it.sort_order === "number");
+  if (items.length === 0) return err("items required");
 
-  // Update each issue's sort_order. Small N (a board column), so sequential is fine.
-  for (const it of items) {
-    if (!it?.id || typeof it.sort_order !== "number") continue;
-    await getAdmin().from("issues")
+  // H6 fix: batch all updates in parallel instead of N sequential awaits.
+  // Each update is scoped to the project to prevent cross-project writes.
+  await Promise.all(items.map((it) =>
+    getAdmin().from("issues")
       .update({ sort_order: it.sort_order, updated_by: user.id })
       .eq("id", it.id)
-      .eq("project_id", params.projectId);
-  }
+      .eq("project_id", params.projectId)
+  ));
 
   return ok({ reordered: items.length });
 }

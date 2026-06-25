@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  DndContext, DragOverlay, PointerSensor, KeyboardSensor,
+  DndContext, DragOverlay, PointerSensor, KeyboardSensor, TouchSensor,
   useSensor, useSensors, closestCorners, type DragStartEvent, type DragEndEvent, type DragOverEvent, type DragCancelEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
@@ -151,6 +151,7 @@ export default function IssuesPage() {
   // ---- Drag and drop ----
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -348,7 +349,7 @@ export default function IssuesPage() {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory md:grid md:grid-cols-5">
+        <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-proximity lg:grid lg:grid-cols-5">
           {GROUPS.map((group) => {
             const stateInfo = states.find(s => s.group_name === group);
             const droppable = !!stateInfo;
