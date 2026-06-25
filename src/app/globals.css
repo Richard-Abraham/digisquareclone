@@ -138,10 +138,6 @@
   .list-item-hover {
     @apply list-item hover:bg-surface-muted cursor-pointer;
   }
-  .list-item-divider {
-    @apply divide-y divide-border-subtle;
-  }
-
   .priority-dot {
     @apply inline-block size-2 rounded-full flex-shrink-0;
   }
