@@ -282,23 +282,14 @@ export default function IssuesPage() {
         })}
       </div>
 
-      {/* Pagination */}
+      {/* Pagination — simple "Page N of M" */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 mt-8">
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
             className="btn-secondary btn-sm">Previous</button>
-          <div className="flex items-center gap-2">
-            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-              const p = Math.max(1, Math.min(page - 3, totalPages - 6)) + i;
-              if (p > totalPages) return null;
-              return (
-                <button key={p} onClick={() => setPage(p)}
-                  className={`btn-sm min-w-[32px] ${p === page ? "btn-primary" : "btn-ghost"}`}>
-                  {p}
-                </button>
-              );
-            })}
-          </div>
+          <span className="text-sm text-text-secondary font-medium">
+            Page {page} of {totalPages}
+          </span>
           <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
             className="btn-secondary btn-sm">Next</button>
         </div>
