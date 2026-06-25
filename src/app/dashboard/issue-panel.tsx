@@ -1,22 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, getToken } from "@/lib/api";
+import { api } from "@/lib/api";
 import { BugIcon, CheckIcon, CloseIcon } from "@/components/icons";
 import { PRIO_META } from "@/lib/tasks";
+import { useIssueTimer, useIssueDependencies, fmtDuration } from "@/lib/issue-hooks";
 
 interface Issue { id: string; name: string; priority: string; sequence_id: number; state_id: string; is_bug: boolean; target_date: string | null; created_at: string; created_by: string; creator: { display_name?: string } | null; state: { id: string; name: string; group_name: string; color: string } | null; assignees: { user_id?: string; display_name?: string }[]; }
 interface State { id: string; name: string; group_name: string; color: string; }
 interface Member { user_id: string; profile: { display_name: string } | null; }
-interface Dep { id: string; name: string; sequence_id: number; state: { name: string; group_name: string; color: string } | null }
-interface TimeLog { id: string; started_at: string; ended_at: string | null; }
-
-function fmtDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
 
 interface IssuePanelProps {
   issueId: string;
@@ -38,17 +30,12 @@ export default function IssuePanel({ issueId, wsSlug, projId, members, states, o
   const [editPriority, setEditPriority] = useState("");
   const [editTargetDate, setEditTargetDate] = useState("");
 
-  // Time tracking
-  const [timerActive, setTimerActive] = useState(false);
-  const [totalSeconds, setTotalSeconds] = useState(0);
-  const [timerBusy, setTimerBusy] = useState(false);
-
-  // Dependencies
-  const [blocking, setBlocking] = useState<Dep[]>([]);
-  const [blockedBy, setBlockedBy] = useState<Dep[]>([]);
-  const [depSearch, setDepSearch] = useState("");
-  const [depResults, setDepResults] = useState<Dep[]>([]);
-  const [depBusy, setDepBusy] = useState(false);
+  // Shared hooks
+  const { timerActive, totalSeconds, timerBusy, loadTime, toggleTimer } = useIssueTimer(base);
+  const {
+    blocking, blockedBy, depSearch, setDepSearch, depResults, depBusy,
+    addDep, removeDep, loadDeps,
+  } = useIssueDependencies(base, wsSlug, projId, issueId);
 
   useEffect(() => {
     loadIssue();
@@ -67,22 +54,6 @@ export default function IssuePanel({ issueId, wsSlug, projId, members, states, o
     } catch {} finally { setLoading(false); }
   }
 
-  async function loadTime() {
-    try {
-      const res = await api<{ logs: TimeLog[]; active_timer: TimeLog | null; total_seconds: number }>(`${base}/time`);
-      setTimerActive(!!res.active_timer);
-      setTotalSeconds(res.total_seconds);
-    } catch {}
-  }
-
-  async function loadDeps() {
-    try {
-      const res = await api<{ blocking: Dep[]; blocked_by: Dep[] }>(`${base}/dependencies`);
-      setBlocking(res.blocking);
-      setBlockedBy(res.blocked_by);
-    } catch {}
-  }
-
   async function save() {
     try {
       const updated = await api<Issue>(base, { method: "PATCH", body: { name: editName, state_id: editState || undefined, priority: editPriority, target_date: editTargetDate || null } });
@@ -90,40 +61,6 @@ export default function IssuePanel({ issueId, wsSlug, projId, members, states, o
       onIssueUpdated(updated);
     } catch {}
   }
-
-  async function toggleTimer() {
-    setTimerBusy(true);
-    try {
-      await api(`${base}/time`, { method: "POST", body: { action: timerActive ? "stop" : "start" } });
-      setTimerActive(!timerActive);
-      await loadTime();
-    } catch {} finally { setTimerBusy(false); }
-  }
-
-  async function addDep(dependsOnId: string) {
-    setDepBusy(true);
-    try { await api(`${base}/dependencies`, { method: "POST", body: { depends_on_id: dependsOnId } }); setDepSearch(""); setDepResults([]); await loadDeps(); }
-    catch {} finally { setDepBusy(false); }
-  }
-
-  async function removeDep(dependsOnId: string) {
-    await api(`${base}/dependencies?depends_on_id=${dependsOnId}`, { method: "DELETE" });
-    await loadDeps();
-  }
-
-  // Search tasks for dependency picker
-  useEffect(() => {
-    if (depSearch.length < 2) { setDepResults([]); return; }
-    const t = setTimeout(async () => {
-      try {
-        const token = getToken();
-        const res = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues?search=${encodeURIComponent(depSearch)}&pageSize=10`, { headers: { Authorization: `Bearer ${token}` } });
-        const json = await res.json();
-        if (json.success) setDepResults(json.data.issues.filter((i: any) => i.id !== issueId));
-      } catch {}
-    }, 250);
-    return () => clearTimeout(t);
-  }, [depSearch, wsSlug, projId, issueId]);
 
   const prio = issue ? (PRIO_META[issue.priority] || PRIO_META.none) : PRIO_META.none;
 

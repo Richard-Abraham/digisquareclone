@@ -5,9 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { BugIcon, CheckIcon, CloseIcon } from "@/components/icons";
 import { PRIO_META } from "@/lib/tasks";
-
-interface Dep { id: string; name: string; sequence_id: number; state: { name: string; color: string } | null }
-interface TimeEntry { id: string; started_at: string; ended_at: string | null; }
+import { useIssueTimer, useIssueDependencies } from "@/lib/issue-hooks";
 
 interface Issue { id: string; name: string; description_html: string; priority: string; sequence_id: number; state_id: string; assignee_id: string | null; is_bug: boolean; start_date: string | null; target_date: string | null; created_at: string; state: { id: string; name: string; group_name: string; color: string } | null; assignees: { user_id?: string; display_name?: string }[]; tag_ids: string[]; }
 interface State { id: string; name: string; group_name: string; color: string; }
@@ -42,13 +40,13 @@ export default function IssueDetailPage() {
   const [editBug, setEditBug] = useState(false);
   const [newSub, setNewSub] = useState("");
   const [newComment, setNewComment] = useState("");
-  const [timerActive, setTimerActive] = useState(false);
-  const [totalSeconds, setTotalSeconds] = useState(0);
-  const [timerBusy, setTimerBusy] = useState(false);
-  const [blocking, setBlocking] = useState<Dep[]>([]);
-  const [blockedBy, setBlockedBy] = useState<Dep[]>([]);
-  const [depSearch, setDepSearch] = useState("");
-  const [depResults, setDepResults] = useState<Dep[]>([]);
+
+  // Shared hooks
+  const { timerActive, totalSeconds, timerBusy, loadTime, toggleTimer } = useIssueTimer(base);
+  const {
+    blocking, blockedBy, depSearch, setDepSearch, depResults,
+    addDep, loadDeps,
+  } = useIssueDependencies(base, wsSlug, projId, issueId);
 
   const { issue, states, members, tags, subtasks, comments, reviewers, activity, me } = bundle || {};
   if (typeof window !== "undefined" && !localStorage.getItem("token")) { router.push("/login"); return null as any; }
@@ -61,21 +59,6 @@ export default function IssueDetailPage() {
   }, [detailUrl]);
 
   useEffect(() => { if (!wsSlug || !projId) return; loadData().catch(() => setLoading(false)); loadTime(); loadDeps(); }, [wsSlug, projId, issueId, loadData]);
-
-  async function loadTime() {
-    try { const res = await api<{ active_timer: TimeEntry | null; total_seconds: number }>(`${base}/time`); setTimerActive(!!res.active_timer); setTotalSeconds(res.total_seconds); } catch {}
-  }
-  async function loadDeps() {
-    try { const res = await api<{ blocking: Dep[]; blocked_by: Dep[] }>(`${base}/dependencies`); setBlocking(res.blocking); setBlockedBy(res.blocked_by); } catch {}
-  }
-  async function toggleTimer() {
-    setTimerBusy(true);
-    try { await api(`${base}/time`, { method: "POST", body: { action: timerActive ? "stop" : "start" } }); setTimerActive(!timerActive); await loadTime(); }
-    finally { setTimerBusy(false); }
-  }
-  async function addDep(dependsOnId: string) {
-    await api(`${base}/dependencies`, { method: "POST", body: { depends_on_id: dependsOnId } }); setDepSearch(""); setDepResults([]); await loadDeps();
-  }
 
   async function save() {
     setSaving(true);
@@ -127,21 +110,6 @@ export default function IssueDetailPage() {
     const updated = await api<Reviewer[]>(`${base}/reviewers`);
     setBundle(prev => prev ? { ...prev, reviewers: updated } : prev);
   }
-
-  useEffect(() => {
-    if (depSearch.length < 2) { setDepResults([]); return; }
-    const t = setTimeout(async () => {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-      const res = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues?search=${encodeURIComponent(depSearch)}&pageSize=10`, { headers: { Authorization: `Bearer ${token}` } });
-      const json = await res.json();
-      if (json.success) setDepResults(json.data.issues.filter((i: any) => i.id !== issueId));
-    }, 250);
-    return () => clearTimeout(t);
-  }, [depSearch, wsSlug, projId, issueId]);
-  useEffect(() => {
-    if (depSearch.length >= 2) return;
-    setDepResults([]);
-  }, [depSearch]);
 
   if (loading) return (
     <div className="flex h-full items-center justify-center">
