@@ -29,13 +29,14 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   let candidates: { user_id: string; display_name: string }[] = [];
   if (access.isManager) {
     if (ids.length) {
-      // Use NOT IN to delegate filtering to PostgREST instead of fetching all profiles
+      // P2 fix: cap candidates to 50 + use the builder's array form instead of manual CSV.
       const { data: all } = await getAdmin().from("profiles").select("user_id, display_name")
-        .filter("user_id", "not.in", `(${ids.join(",")})`)
-        .order("display_name");
+        .not("user_id", "in", ids)
+        .order("display_name")
+        .limit(50);
       candidates = (all || []).map((p: any) => ({ user_id: p.user_id, display_name: p.display_name }));
     } else {
-      const { data: all } = await getAdmin().from("profiles").select("user_id, display_name").order("display_name");
+      const { data: all } = await getAdmin().from("profiles").select("user_id, display_name").order("display_name").limit(50);
       candidates = (all || []).map((p: any) => ({ user_id: p.user_id, display_name: p.display_name }));
     }
   }

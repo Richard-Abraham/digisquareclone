@@ -71,7 +71,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const userIds = Array.from(new Set(rows.flatMap((i: any) => [
     i.assignee_id, i.created_by, ...(i.assignees || []).map((a: any) => a.user_id),
   ]).filter(Boolean)));
-  const { data: profiles } = userIds.length ? await getAdmin().from("profiles").select("*").in("user_id", userIds) : { data: [] };
+  // P4 fix: only select display_name (was select("*") fetching avatar_url, created_at, etc).
+  const { data: profiles } = userIds.length ? await getAdmin().from("profiles").select("user_id, display_name").in("user_id", userIds) : { data: [] };
   const pm = new Map((profiles || []).map((p: any) => [p.user_id, p]));
   const enriched = rows.map((i: any) => ({
     ...i,

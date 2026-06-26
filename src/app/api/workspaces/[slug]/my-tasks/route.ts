@@ -29,7 +29,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   const { data, error: qe } = await getAdmin().from("issues").select(
     "*, state:states(*), project:projects(id, name), assignees:issue_assignees(user_id), subtasks:issue_subtasks(done)"
-  ).eq("workspace_id", wsId).in("id", idsForView).is("archived_at", null);
+  ).eq("workspace_id", wsId).in("id", idsForView).is("archived_at", null)
+   .order("sort_order").limit(100); // P2 fix: cap to 100 + sort by sort_order
   if (qe) return err(qe.message, 500);
 
   let rows = (data || []).map((i: any) => ({ ...i, group: i.state?.group_name ?? "backlog" }));
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   else rows = rows.filter((i: any) => i.group !== "completed"); // all + review
 
   const userIds = Array.from(new Set(rows.flatMap((i: any) => (i.assignees || []).map((a: any) => a.user_id))));
-  const { data: profiles } = userIds.length ? await getAdmin().from("profiles").select("*").in("user_id", userIds) : { data: [] };
+  const { data: profiles } = userIds.length ? await getAdmin().from("profiles").select("user_id, display_name").in("user_id", userIds) : { data: [] };
   const pm = new Map((profiles || []).map((p: any) => [p.user_id, p]));
 
   const enriched = rows.map((i: any) => ({

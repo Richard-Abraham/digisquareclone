@@ -8,10 +8,25 @@ export async function GET(req: NextRequest) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
 
+  // U6 fix: compute unread count server-side via a head count, not from the 50-row page.
+  const url = new URL(req.url);
+  const countOnly = url.searchParams.get("count") === "1";
+  if (countOnly) {
+    const { count } = await getAdmin().from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("recipient_id", user.id).is("read_at", null);
+    return ok({ unread: count || 0 });
+  }
+
   const { data: notifs } = await getAdmin().from("notifications")
     .select("*").eq("recipient_id", user.id).order("created_at", { ascending: false }).limit(50);
   const rows = notifs || [];
-  const unread = rows.filter((n: any) => !n.read_at).length;
+
+  // Accurate unread count from the DB, not from the 50-row page.
+  const { count: unreadCount } = await getAdmin().from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("recipient_id", user.id).is("read_at", null);
+  const unread = unreadCount || 0;
 
   // Enrich with issue name, workspace slug (for links), and actor name.
   const issueIds = Array.from(new Set(rows.map((n: any) => n.issue_id).filter(Boolean)));
