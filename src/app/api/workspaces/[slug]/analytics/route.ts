@@ -3,17 +3,27 @@ import { getAdmin } from "@/lib/supabase";
 import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { getWorkspaceAccess } from "@/lib/access";
+import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
-  const user = await getUser(req);
-  if (!user) return err("Unauthorized", 401);
-  const access = await getWorkspaceAccess(params.slug, user.id);
-  if (!access) return err("Access denied", 403);
-  const wsId = access.workspace.id;
+  try {
+    const user = await getUser(req);
+    if (!user) return err("Unauthorized", 401);
+    if (!checkRateLimit(`workspace-analytics:get:${getClientKey(req)}`, { windowMs: 60_000, maxRequests: 30 })) {
+      return err("Too many requests", { status: 429 });
+    }
+    const access = await getWorkspaceAccess(params.slug, user.id);
+    if (!access) return err("Access denied", 403);
+    const wsId = access.workspace.id;
 
-  const tab = new URL(req.url).searchParams.get("tab") || "overview";
-  if (tab === "work-items") return ok(await workItemsStats(wsId));
-  return ok(await overviewStats(wsId));
+    const tab = new URL(req.url).searchParams.get("tab") || "overview";
+    if (tab === "work-items") return ok(await workItemsStats(wsId));
+    return ok(await overviewStats(wsId));
+  } catch (e) {
+    logger.error("GET /api/workspaces/[slug]/analytics failed", e);
+    return err("Internal server error", { status: 500 });
+  }
 }
 
 async function overviewStats(wsId: string) {
