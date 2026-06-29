@@ -1,7 +1,5 @@
 "use client";
 
-import { NextResponse } from "next/server";
-
 // Tiny client-side fetch wrapper: attaches the bearer token and unwraps { success, data }.
 // R4: Added timeout via AbortController (10s default).
 // P7: Supports an external AbortSignal for cancellation on unmount.
@@ -12,8 +10,39 @@ export function getToken(): string | null {
   return typeof window !== "undefined" ? localStorage.getItem("token") : null;
 }
 
+function getRefreshToken(): string | null {
+  return typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
+}
+
 export function clearToken() {
-  if (typeof window !== "undefined") localStorage.removeItem("token");
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("token");
+    localStorage.removeItem("refresh_token");
+  }
+}
+
+let refreshing: Promise<boolean> | null = null;
+
+async function tryRefresh(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    try {
+      const res = await fetch("/api/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      const json = await res.json();
+      if (!json.success) return false;
+      localStorage.setItem("token", json.data.token);
+      if (json.data.refresh_token) localStorage.setItem("refresh_token", json.data.refresh_token);
+      return true;
+    } catch { return false; }
+    finally { refreshing = null; }
+  })();
+  return refreshing;
 }
 
 interface ApiOptions {
@@ -23,11 +52,12 @@ interface ApiOptions {
   timeout?: number;
 }
 
+let refreshingThisCall = false;
+
 export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Promise<T> {
   const token = getToken();
   const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
 
-  // Combine external signal with our timeout signal.
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
   if (opts.signal) {
@@ -44,14 +74,17 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
       signal: controller.signal,
     });
-    const json = await res.json().catch(() => ({ success: false, error: "Bad response" }));
-    if (res.status === 401) {
-      // S1: Token expired or invalid — clear and redirect to login.
+    if (res.status === 401 && !refreshingThisCall) {
+      refreshingThisCall = true;
+      const refreshed = await tryRefresh();
+      refreshingThisCall = false;
+      if (refreshed) return api(path, opts);
       clearToken();
       if (typeof window !== "undefined" && window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
     }
+    const json = await res.json().catch(() => ({ success: false, error: "Bad response" }));
     if (!json.success) throw new Error(json.error || `Request failed (${res.status})`);
     return json.data as T;
   } catch (e: any) {

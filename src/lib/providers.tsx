@@ -39,13 +39,31 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const refresh = useCallback(async () => {
-    const token = getToken();
+    const getRefreshToken = () => typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
+    let token = getToken();
     if (!token) { setUser(null); setProfile(null); setReady(true); return; }
     try {
-      const res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } });
+      let res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        const rt = getRefreshToken();
+        if (rt) {
+          const refreshRes = await fetch("/api/auth/refresh", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refresh_token: rt }),
+          });
+          const refreshJson = await refreshRes.json();
+          if (refreshJson.success) {
+            localStorage.setItem("token", refreshJson.data.token);
+            if (refreshJson.data.refresh_token) localStorage.setItem("refresh_token", refreshJson.data.refresh_token);
+            token = refreshJson.data.token;
+            res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } });
+          }
+        }
+      }
       const json = await res.json();
       if (!json.success) {
         localStorage.removeItem("token");
+        localStorage.removeItem("refresh_token");
         router.push("/login");
         return;
       }

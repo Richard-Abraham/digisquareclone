@@ -4,5 +4,6 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(req: NextRequest) {
   const res = NextResponse.json({ success: true, data: { loggedOut: true } });
   res.cookies.delete("sb-token");
+  res.cookies.delete("sb-refresh-token");
   return res;
 }

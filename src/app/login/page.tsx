@@ -51,7 +51,8 @@ export default function LoginPage() {
     if (remember) localStorage.setItem(REMEMBER_KEY, email);
     else localStorage.removeItem(REMEMBER_KEY);
     localStorage.setItem("token", json.data.token);
-    router.push("/dashboard");
+    if (json.data.refresh_token) localStorage.setItem("refresh_token", json.data.refresh_token);
+    window.location.href = "/dashboard";
   }
 
   const features = [
