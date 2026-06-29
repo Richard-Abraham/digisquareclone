@@ -9,11 +9,11 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useAuth } from "@/lib/providers";
 import { api } from "@/lib/api";
 import { deriveIdentifier } from "@/lib/tasks";
-import { TasksIcon } from "@/components/icons";
+import { TasksIcon, SpinnerIcon, UserIcon, ChartIcon, CheckIcon } from "@/components/icons";
+import { StatCard, ChartCard, DonutChart, BarChart, chartColors } from "@/components/charts";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Drawer } from "@/components/ui/Drawer";
-import { SpinnerIcon } from "@/components/icons";
 import IssuePanel from "./issue-panel";
 import {
   KanbanColumn, DragPreviewCard, GROUPS, PRIORITIES, PRIO_META,
@@ -143,6 +143,19 @@ export default function IssuesPage() {
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  // Derived stats
+  const statsByPriority: Record<string, number> = { urgent: 0, high: 0, medium: 0, low: 0, none: 0 };
+  const statsByState: Record<string, number> = {};
+  for (const i of issues) {
+    const g = i.state?.group_name || "backlog";
+    statsByState[g] = (statsByState[g] || 0) + 1;
+    if (statsByPriority[i.priority] !== undefined) statsByPriority[i.priority]++;
+  }
+  const priorityChartData = Object.entries(statsByPriority)
+    .filter(([, v]) => v > 0)
+    .map(([k, v]) => ({ name: k, count: v }));
+  const stateChartData = Object.entries(statsByState).map(([k, v]) => ({ name: k, count: v }));
 
   // ---- Drag and drop ----
   const sensors = useSensors(
@@ -312,6 +325,30 @@ export default function IssuesPage() {
         </div>
       </div>
 
+      {/* Stats + Mini Charts */}
+      {issues.length > 0 && (
+        <div className="mb-6 animate-fade-in space-y-5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard label="Total Tasks" value={total} icon={<TasksIcon />} />
+            <StatCard label="Team Members" value={members.length} icon={<UserIcon />} />
+            <StatCard label="Active" value={statsByState.started || 0} sub="In Progress" icon={<ChartIcon />} color={chartColors.amber} />
+            <StatCard label="Completed" value={statsByState.completed || 0} sub="Done this sprint" icon={<CheckIcon size={18} />} color={chartColors.emerald} />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {priorityChartData.length > 0 && (
+              <ChartCard title="Priority Distribution">
+                <DonutChart data={priorityChartData} dataKey="count" nameKey="name" colors={[chartColors.red, chartColors.amber, chartColors.primary, chartColors.slate, "#CBD5E1"]} height={200} innerRadius={40} outerRadius={70} />
+              </ChartCard>
+            )}
+            {stateChartData.length > 0 && (
+              <ChartCard title="State Breakdown">
+                <BarChart data={stateChartData} xKey="name" yKey="count" color={chartColors.primary} height={180} barSize={36} />
+              </ChartCard>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex gap-2 mb-5 flex-wrap">
         <select value={filterState} onChange={e => setFilterState(e.target.value)} className="select text-xs w-auto min-w-[120px]">
@@ -464,3 +501,4 @@ export default function IssuesPage() {
     </div>
   );
 }
+
