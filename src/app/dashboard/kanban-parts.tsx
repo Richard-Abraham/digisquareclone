@@ -86,8 +86,8 @@ export function KanbanCard({ issue, stateColor, onOpen }: KanbanCardProps) {
       {...listeners}
       onClick={() => onOpen(issue.id)}
       className={clsx(
-        "card p-3 cursor-grab active:cursor-grabbing transition-all duration-150 hover:shadow-elevated hover:-translate-y-0.5 border-l-[3px] group relative",
-        isDragging && "opacity-40"
+        "card px-3 py-2.5 cursor-grab active:cursor-grabbing transition-all duration-150 hover:shadow-elevated hover:-translate-y-0.5 border-l-[3px] group relative border-b border-border-subtle last:border-b-0",
+        isDragging && "opacity-40 ring-2 ring-primary-300 scale-[1.02]"
       )}
     >
       <span className="absolute top-2.5 right-2.5 text-text-tertiary/0 group-hover:text-text-tertiary transition-colors">
@@ -121,18 +121,18 @@ export function KanbanColumn({ group, items, stateInfo, droppable, activeId, onO
   return (
     <div
       className={clsx(
-        "min-w-[260px] snap-start rounded-xl p-3 transition-all duration-200",
+        "min-w-[260px] snap-start rounded-xl p-3.5 transition-all duration-200",
         isOver && droppable ? "bg-primary-50 ring-2 ring-primary-300 dark:bg-primary-500/10" : "bg-surface-2"
       )}
     >
-      <div className="flex items-center justify-between mb-3 px-1">
+      <div className="flex items-center justify-between mb-3.5 px-1">
         <div className="flex items-center gap-2">
           <span className="size-2 rounded-full" style={{ backgroundColor: stateInfo?.color }} />
           <span className="text-xs font-semibold text-text-secondary">{stateInfo?.name || group}</span>
         </div>
         <span className="text-xs font-medium text-text-tertiary px-1.5 py-0.5 rounded-full bg-surface-card/50">{items.length}</span>
       </div>
-      <div ref={setNodeRef} className="space-y-2 min-h-[60px]">
+      <div ref={setNodeRef} className="space-y-3 min-h-[60px]">
         <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
           {items.map((issue) => (
             <KanbanCard key={issue.id} issue={issue} stateColor={stateInfo?.color} onOpen={onOpen} />
@@ -141,7 +141,7 @@ export function KanbanColumn({ group, items, stateInfo, droppable, activeId, onO
         {items.length === 0 && (
           <div
             className={clsx(
-              "text-xs text-center py-6 rounded-lg border-2 border-dashed transition-colors",
+              "text-xs text-center py-7 rounded-lg border-2 border-dashed transition-colors",
               isOver && droppable ? "border-primary-300 bg-primary-50/50 text-primary dark:bg-primary-500/10" : showDropHere ? "border-border-accent text-text-tertiary" : "border-border text-text-tertiary"
             )}
           >
