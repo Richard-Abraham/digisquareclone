@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdmin } from "@/lib/supabase";
 import { ok, err } from "@/lib/response";
+import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
+
+const RATE_LIMIT = { windowMs: 60_000, maxRequests: 5 };
 
 export async function POST(req: NextRequest) {
   try {
+    const clientKey = getClientKey(req);
+    if (!checkRateLimit(`login:${clientKey}`, RATE_LIMIT)) {
+      return err("Too many attempts. Please try again in a minute.", 429);
+    }
+
     const { email, password } = await req.json() as { email?: string; password?: string };
     if (!email || !password) return err("Email and password required");
 

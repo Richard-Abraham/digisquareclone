@@ -1,6 +1,42 @@
 import { getAdmin } from "./supabase";
 import { isManager, deriveIdentifier } from "./tasks";
 
+// Simple TTL cache for project state lookups (hot paths in standup + report-task).
+const stateCache = new Map<string, { completed: string | null; active: string | null; expires: number }>();
+const STATE_CACHE_TTL_MS = 30_000;
+
+function cacheKey(projectId: string) { return `states:${projectId}`; }
+function getCached(projectId: string) {
+  const entry = stateCache.get(cacheKey(projectId));
+  if (entry && entry.expires > Date.now()) return entry;
+  stateCache.delete(cacheKey(projectId));
+  return null;
+}
+function setCached(projectId: string, completed: string | null, active: string | null) {
+  stateCache.set(cacheKey(projectId), { completed, active, expires: Date.now() + STATE_CACHE_TTL_MS });
+}
+async function resolveStateIds(projectId: string) {
+  const cached = getCached(projectId);
+  if (cached) return cached;
+  const { data } = await getAdmin().from("states").select("id, group_name, is_default, sequence").eq("project_id", projectId).order("sequence");
+  const completed = data?.length
+    ? (data.filter((s: { group_name: string }) => s.group_name === "completed").sort((a: any, b: any) => (a.is_default ? -1 : 1))[0] ?? null)?.id ?? null
+    : null;
+  const active = data?.length
+    ? (data.find((s: { group_name: string }) => s.group_name === "started")
+      ?? data.find((s: { group_name: string }) => s.group_name === "unstarted")
+      ?? data.find((s: { is_default?: boolean }) => s.is_default)
+      ?? data[0]).id
+    : null;
+  setCached(projectId, completed, active);
+  return { completed, active };
+}
+// Light cleanup every minute.
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of Array.from(stateCache.entries())) if (v.expires <= now) stateCache.delete(k);
+}, 60_000);
+
 export interface WorkspaceAccess {
   workspace: { id: string; slug: string; owner_id: string };
   role: number | null;
@@ -111,9 +147,7 @@ export async function ensureProjectMembers(projectId: string, userIds: string[])
 
 /** Find the default completed-group state for a project (used to mark issues done). */
 export async function getCompletedState(projectId: string): Promise<string | null> {
-  const { data } = await getAdmin().from("states").select("id, is_default").eq("project_id", projectId).eq("group_name", "completed").order("sequence");
-  if (!data?.length) return null;
-  return (data.find((s: { is_default?: boolean }) => s.is_default) ?? data[0]).id;
+  return (await resolveStateIds(projectId)).completed;
 }
 
 /** Check if a user can view all team standups (owner or designated standup manager). */
@@ -126,10 +160,5 @@ export async function canViewAllStandups(workspaceId: string, userId: string, ow
 
 /** Find a sensible "active" state to move an issue back to when un-completing it. */
 export async function getActiveState(projectId: string): Promise<string | null> {
-  const { data } = await getAdmin().from("states").select("id, group_name, is_default, sequence").eq("project_id", projectId).order("sequence");
-  if (!data?.length) return null;
-  const started = data.find((s: { group_name: string }) => s.group_name === "started");
-  const unstarted = data.find((s: { group_name: string }) => s.group_name === "unstarted");
-  const def = data.find((s: { is_default?: boolean }) => s.is_default);
-  return (started ?? unstarted ?? def ?? data[0]).id;
+  return (await resolveStateIds(projectId)).active;
 }

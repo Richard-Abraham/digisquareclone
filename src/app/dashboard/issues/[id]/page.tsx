@@ -3,12 +3,14 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { BugIcon, CheckIcon, CloseIcon } from "@/components/icons";
+import { BugIcon, CheckIcon, CloseIcon, SpinnerIcon } from "@/components/icons";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { IssueDetailCore } from "@/components/issue/IssueDetailCore";
 
 interface Dep { id: string; name: string; sequence_id: number; state: { name: string; color: string } | null }
 interface TimeEntry { id: string; started_at: string; ended_at: string | null; }
 
-interface Issue { id: string; name: string; description_html: string; priority: string; sequence_id: number; state_id: string; assignee_id: string | null; is_bug: boolean; start_date: string | null; target_date: string | null; created_at: string; state: { id: string; name: string; group_name: string; color: string } | null; assignees: { user_id?: string; display_name?: string }[]; tag_ids: string[]; }
+interface Issue { id: string; name: string; description_html: string; priority: string; sequence_id: number; state_id: string; assignee_id: string | null; is_bug: boolean; start_date: string | null; target_date: string | null; created_at: string; created_by: string; state: State | null; assignees: { user_id?: string; display_name?: string }[]; tag_ids: string[]; }
 interface State { id: string; name: string; group_name: string; color: string; }
 interface Member { user_id: string; profile: { display_name: string } | null; }
 interface Tag { id: string; name: string; kind: string; }
@@ -39,21 +41,13 @@ function IssueDetailPageContent() {
 
   const [bundle, setBundle] = useState<DetailBundle | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [editState, setEditState] = useState("");
-  const [editPriority, setEditPriority] = useState("");
-  const [editTargetDate, setEditTargetDate] = useState("");
-  const [editBug, setEditBug] = useState(false);
   const [newSub, setNewSub] = useState("");
   const [newComment, setNewComment] = useState("");
-  const [timerActive, setTimerActive] = useState(false);
-  const [totalSeconds, setTotalSeconds] = useState(0);
-  const [timerBusy, setTimerBusy] = useState(false);
-  const [blocking, setBlocking] = useState<Dep[]>([]);
-  const [blockedBy, setBlockedBy] = useState<Dep[]>([]);
-  const [depSearch, setDepSearch] = useState("");
-  const [depResults, setDepResults] = useState<Dep[]>([]);
+  const [deleting, setDeleting] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [subBusy, setSubBusy] = useState(false);
+  const [commentBusy, setCommentBusy] = useState(false);
+  const [reviewerBusy, setReviewerBusy] = useState(false);
 
   const { issue, states, members, tags, subtasks, comments, reviewers, activity, me } = bundle || {};
 
@@ -64,36 +58,17 @@ function IssueDetailPageContent() {
 
   const loadData = useCallback(async () => {
     const b = await api<DetailBundle>(detailUrl);
-    setBundle(b); setEditName(b.issue.name); setEditState(b.issue.state_id || "");
-    setEditPriority(b.issue.priority); setEditTargetDate(b.issue.target_date || ""); setEditBug(b.issue.is_bug);
+    setBundle(b);
     setLoading(false);
   }, [detailUrl]);
 
-  useEffect(() => { if (!wsSlug || !projId) return; loadData().catch(() => setLoading(false)); loadTime(); loadDeps(); }, [wsSlug, projId, issueId, loadData]);
+  useEffect(() => { if (!wsSlug || !projId) return; loadData().catch(() => setLoading(false)); }, [wsSlug, projId, issueId, loadData]);
 
-  async function loadTime() {
-    try { const res = await api<{ active_timer: TimeEntry | null; total_seconds: number }>(`${base}/time`); setTimerActive(!!res.active_timer); setTotalSeconds(res.total_seconds); } catch {}
+  async function deleteIssue() {
+    setDeleting(true);
+    try { await api(base, { method: "DELETE" }); router.push("/dashboard"); }
+    finally { setDeleting(false); setShowDelete(false); }
   }
-  async function loadDeps() {
-    try { const res = await api<{ blocking: Dep[]; blocked_by: Dep[] }>(`${base}/dependencies`); setBlocking(res.blocking); setBlockedBy(res.blocked_by); } catch {}
-  }
-  async function toggleTimer() {
-    setTimerBusy(true);
-    try { await api(`${base}/time`, { method: "POST", body: { action: timerActive ? "stop" : "start" } }); setTimerActive(!timerActive); await loadTime(); }
-    finally { setTimerBusy(false); }
-  }
-  async function addDep(dependsOnId: string) {
-    await api(`${base}/dependencies`, { method: "POST", body: { depends_on_id: dependsOnId } }); setDepSearch(""); setDepResults([]); await loadDeps();
-  }
-
-  async function save() {
-    setSaving(true);
-    try {
-      const updated = await api<Issue>(base, { method: "PATCH", body: { name: editName, state_id: editState || undefined, priority: editPriority, target_date: editTargetDate || null, is_bug: editBug } });
-      setBundle(prev => prev ? { ...prev, issue: updated } : prev);
-    } finally { setSaving(false); }
-  }
-  async function deleteIssue() { if (!confirm("Delete this task?")) return; await api(base, { method: "DELETE" }); router.push("/dashboard"); }
 
   const assigneeIds = () => (issue?.assignees || []).map((a) => a.user_id!).filter(Boolean);
   async function toggleAssignee(uid: string) {
@@ -110,8 +85,11 @@ function IssueDetailPageContent() {
   }
   async function addSub() {
     if (!newSub.trim()) return;
-    const s = await api<SubTask>(`${base}/subtasks`, { method: "POST", body: { title: newSub } });
-    setNewSub(""); setBundle(prev => prev ? { ...prev, subtasks: [...prev.subtasks, s] } : prev);
+    setSubBusy(true);
+    try {
+      const s = await api<SubTask>(`${base}/subtasks`, { method: "POST", body: { title: newSub } });
+      setNewSub(""); setBundle(prev => prev ? { ...prev, subtasks: [...prev.subtasks, s] } : prev);
+    } finally { setSubBusy(false); }
   }
   async function toggleSub(s: SubTask) {
     setBundle(prev => prev ? { ...prev, subtasks: prev.subtasks.map(st => st.id === s.id ? { ...st, done: !st.done } : st) } : prev);
@@ -123,13 +101,19 @@ function IssueDetailPageContent() {
   }
   async function addComment() {
     if (!newComment.trim()) return;
-    const c = await api<Comment>(`${base}/comments`, { method: "POST", body: { body: newComment } });
-    setNewComment(""); setBundle(prev => prev ? { ...prev, comments: [...prev.comments, c] } : prev);
+    setCommentBusy(true);
+    try {
+      const c = await api<Comment>(`${base}/comments`, { method: "POST", body: { body: newComment } });
+      setNewComment(""); setBundle(prev => prev ? { ...prev, comments: [...prev.comments, c] } : prev);
+    } finally { setCommentBusy(false); }
   }
   async function addReviewer(uid: string) {
-    await api(`${base}/reviewers`, { method: "POST", body: { user_ids: [uid] } });
-    const updated = await api<Reviewer[]>(`${base}/reviewers`);
-    setBundle(prev => prev ? { ...prev, reviewers: updated } : prev);
+    setReviewerBusy(true);
+    try {
+      await api(`${base}/reviewers`, { method: "POST", body: { user_ids: [uid] } });
+      const updated = await api<Reviewer[]>(`${base}/reviewers`);
+      setBundle(prev => prev ? { ...prev, reviewers: updated } : prev);
+    } finally { setReviewerBusy(false); }
   }
   async function myReview(state: string) {
     await api(`${base}/reviewers`, { method: "PATCH", body: { state } });
@@ -138,19 +122,8 @@ function IssueDetailPageContent() {
   }
 
   useEffect(() => {
-    if (depSearch.length < 2) { setDepResults([]); return; }
-    const t = setTimeout(async () => {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-      const res = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues?search=${encodeURIComponent(depSearch)}&pageSize=10`, { headers: { Authorization: `Bearer ${token}` } });
-      const json = await res.json();
-      if (json.success) setDepResults(json.data.issues.filter((i: any) => i.id !== issueId));
-    }, 250);
-    return () => clearTimeout(t);
-  }, [depSearch, wsSlug, projId, issueId]);
-  useEffect(() => {
-    if (depSearch.length >= 2) return;
-    setDepResults([]);
-  }, [depSearch]);
+    if (typeof window !== "undefined" && !localStorage.getItem("token")) router.push("/login");
+  }, [router]);
 
   if (loading) return (
     <div className="flex h-full items-center justify-center">
@@ -185,45 +158,22 @@ function IssueDetailPageContent() {
         )}
       </div>
 
-      {/* Core fields */}
-      <div className="card p-6 space-y-5">
-        <div>
-          <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Name</label>
-          <input value={editName} onChange={(e) => setEditName(e.target.value)}
-            className="input text-base font-semibold" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">State</label>
-            <select value={editState} onChange={(e) => setEditState(e.target.value)} className="select">
-              {states?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Priority</label>
-            <select value={editPriority} onChange={(e) => setEditPriority(e.target.value)} className="select">
-              {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Target date</label>
-            <input type="date" value={editTargetDate} onChange={(e) => setEditTargetDate(e.target.value)} className="input" />
-          </div>
-        </div>
-        <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
-          <input type="checkbox" checked={editBug} onChange={(e) => setEditBug(e.target.checked)}
-            className="rounded border-border text-primary focus:ring-primary-200" />
-          <BugIcon /> Mark as bug
-        </label>
-        <div className="flex items-center gap-4 text-xs text-text-tertiary pt-3 border-t border-border-subtle">
-          <span>Created {new Date(issue.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
-        </div>
-        <div className="flex justify-between pt-2 border-t border-border-subtle">
-          <button onClick={deleteIssue} className="btn-danger btn-sm">Delete task</button>
-          <button onClick={save} disabled={saving} className="btn-primary btn-sm">
-            {saving ? <span className="flex items-center gap-2"><span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</span> : "Save changes"}
-          </button>
-        </div>
+      {/* Core fields (shared with slide-over panel) */}
+      <IssueDetailCore
+        issueId={issueId}
+        wsSlug={wsSlug}
+        projId={projId}
+        states={states || []}
+        issue={issue}
+        onIssueUpdated={(updated) => setBundle(prev => prev ? { ...prev, issue: { ...prev.issue, ...updated } } : prev)}
+      />
+
+      {/* Save / Delete actions */}
+      <div className="flex justify-between card p-4">
+        <button onClick={() => setShowDelete(true)} disabled={deleting} className="btn-danger btn-sm">
+          {deleting ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Deleting...</span> : "Delete task"}
+        </button>
+        <span className="text-xs text-text-tertiary">Changes save automatically</span>
       </div>
 
       {/* Assignees + Tags */}
@@ -258,47 +208,6 @@ function IssueDetailPageContent() {
               );
             })}
           </div>
-        </div>
-      </div>
-
-      {/* Time tracking */}
-      <div className="card p-5">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-3">
-          Time tracked <span className="text-text-tertiary font-normal normal-case">({Math.floor(totalSeconds / 3600)}h {Math.floor((totalSeconds % 3600) / 60)}m)</span>
-        </h3>
-        <button onClick={toggleTimer} disabled={timerBusy}
-          className={`btn-sm ${timerActive ? "!bg-red-50 !text-red-700 hover:!bg-red-100 border border-red-200" : "btn-primary"}`}>
-          {timerBusy ? "..." : timerActive ? "Stop timer" : "Start timer"}
-        </button>
-      </div>
-
-      {/* Dependencies */}
-      <div className="card p-5">
-        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-3">Dependencies</h3>
-        {blockedBy.map((d) => (
-          <div key={d.id} className="flex items-center gap-2 text-sm py-1">
-            <span className="size-1.5 rounded-full" style={{ backgroundColor: d.state?.color }} />
-            <span className="flex-1 truncate text-text-primary font-medium">{d.name}</span>
-          </div>
-        ))}
-        {blocking.map((d) => (
-          <div key={d.id} className="flex items-center gap-2 text-sm py-1">
-            <span className="size-1.5 rounded-full" style={{ backgroundColor: d.state?.color }} />
-            <span className="flex-1 truncate text-text-primary font-medium">{d.name}</span>
-          </div>
-        ))}
-        {blocking.length === 0 && blockedBy.length === 0 && <p className="text-xs text-text-tertiary mb-2">No dependencies</p>}
-        <div className="relative">
-          <input value={depSearch} onChange={(e) => setDepSearch(e.target.value)} placeholder="Link a task..."
-            className="input-sm w-full text-xs" />
-          {depResults.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-surface-1 rounded-lg border border-border shadow-elevated z-10 max-h-32 overflow-y-auto">
-              {depResults.map((r: any) => (
-                <button key={r.id} onClick={() => addDep(r.id)}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-surface-muted truncate">{r.name}</button>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
@@ -354,7 +263,9 @@ function IssueDetailPageContent() {
           <input value={newSub} onChange={(e) => setNewSub(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addSub()} placeholder="Add a subtask..."
             className="input-sm flex-1" />
-          <button onClick={addSub} className="btn-secondary btn-sm">Add</button>
+          <button onClick={addSub} disabled={subBusy || !newSub.trim()} className="btn-secondary btn-sm">
+            {subBusy ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Adding...</span> : "Add"}
+          </button>
         </div>
       </div>
 
@@ -381,7 +292,9 @@ function IssueDetailPageContent() {
           <input value={newComment} onChange={(e) => setNewComment(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addComment()} placeholder="Write a comment..."
             className="input flex-1" />
-          <button onClick={addComment} className="btn-primary btn-sm">Send</button>
+          <button onClick={addComment} disabled={commentBusy || !newComment.trim()} className="btn-primary btn-sm">
+            {commentBusy ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Sending...</span> : "Send"}
+          </button>
         </div>
       </div>
 
@@ -401,6 +314,18 @@ function IssueDetailPageContent() {
           {(!activity || activity.length === 0) && <p className="text-xs text-text-tertiary text-center py-4">No activity recorded yet.</p>}
         </div>
       </div>
+
+      {/* Delete confirm */}
+      <ConfirmDialog
+        open={showDelete}
+        title="Delete task"
+        message={`Delete "${issue.name}"? This permanently removes all comments, subtasks, and activity.`}
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleting}
+        onConfirm={deleteIssue}
+        onCancel={() => setShowDelete(false)}
+      />
     </div>
   );
 }

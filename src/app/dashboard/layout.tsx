@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/providers";
 import { getToken, clearToken } from "@/lib/api";
 import { useUnreadCount } from "@/lib/hooks";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { SpinnerIcon } from "@/components/icons";
 import {
   TasksIcon, UserIcon, CalendarIcon, BellIcon, UsersIcon, ChartIcon, FolderIcon,
 } from "@/components/icons";
@@ -17,6 +18,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, profile, ready } = useAuth();
   const [unread, setUnread] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -137,13 +139,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <p className="text-[11px] text-text-tertiary truncate">{user.email}</p>
               </Link>
             </div>
-            <button onClick={async () => { clearToken(); try { await fetch("/api/auth/logout", { method: "POST" }); } catch {} router.push("/login"); }}
-              className="btn-ghost btn-icon btn-sm text-text-tertiary hover:text-red-500 shrink-0" title="Sign out" aria-label="Sign out">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
+            <button onClick={async () => { setLoggingOut(true); clearToken(); try { await fetch("/api/auth/logout", { method: "POST" }); } catch {} router.push("/login"); }}
+              disabled={loggingOut} className="btn-ghost btn-icon btn-sm text-text-tertiary hover:text-red-500 shrink-0" title="Sign out" aria-label="Sign out">
+              {loggingOut ? <SpinnerIcon size={16} className="animate-spin" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>}
             </button>
             <ThemeToggle size="sm" className="shrink-0" />
           </div>

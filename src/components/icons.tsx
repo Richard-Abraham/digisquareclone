@@ -13,9 +13,9 @@ export function TasksIcon() {
   );
 }
 
-export function UserIcon() {
+export function UserIcon(props: { size?: number; className?: string }) {
   return (
-    <svg {...base()} width={18} height={18}>
+    <svg {...base()} width={props.size ?? 18} height={props.size ?? 18} className={props.className}>
       <circle cx="12" cy="8" r="3.5" />
       <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
     </svg>
@@ -163,6 +163,51 @@ export function SpinnerIcon(props: { size?: number; className?: string }) {
   return (
     <svg {...base()} width={props.size ?? 16} height={props.size ?? 16} className={props.className} strokeWidth={2.5}>
       <path d="M21 12a9 9 0 1 1-9-9" />
+    </svg>
+  );
+}
+
+export function MailIcon(props: { size?: number; className?: string }) {
+  return (
+    <svg {...base()} width={props.size ?? 18} height={props.size ?? 18} className={props.className}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 7l9 6 9-6" />
+    </svg>
+  );
+}
+
+export function LockIcon(props: { size?: number; className?: string }) {
+  return (
+    <svg {...base()} width={props.size ?? 18} height={props.size ?? 18} className={props.className}>
+      <rect x="4" y="10" width="16" height="11" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+export function ArrowRightIcon(props: { size?: number; className?: string }) {
+  return (
+    <svg {...base()} width={props.size ?? 18} height={props.size ?? 18} className={props.className}>
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+export function SparklesIcon(props: { size?: number; className?: string }) {
+  return (
+    <svg {...base()} width={props.size ?? 18} height={props.size ?? 18} className={props.className}>
+      <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" />
+      <path d="M19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2Z" />
+    </svg>
+  );
+}
+
+export function KanbanIcon(props: { size?: number; className?: string }) {
+  return (
+    <svg {...base()} width={props.size ?? 18} height={props.size ?? 18} className={props.className}>
+      <rect x="3" y="3" width="5" height="16" rx="1.5" />
+      <rect x="10" y="3" width="5" height="11" rx="1.5" />
+      <rect x="17" y="3" width="4" height="7" rx="1.5" />
     </svg>
   );
 }

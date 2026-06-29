@@ -8,17 +8,6 @@ import { todayKey } from "@/lib/tasks";
 
 interface Completion { issue_id: string; completed: boolean }
 
-/** Move an issue onto its project's completed state (standup → board sync). */
-async function markIssueDone(issueId: string, workspaceId: string, actorId: string) {
-  const { data: issue } = await getAdmin().from("issues").select("project_id").eq("id", issueId).single();
-  if (!issue) return;
-  const stateId = await getCompletedState(issue.project_id);
-  await getAdmin().from("issues").update({
-    ...(stateId ? { state_id: stateId } : {}), completed_at: new Date().toISOString(), updated_by: actorId,
-  }).eq("id", issueId);
-  await writeActivity({ workspaceId, actorId, kind: "completed", targetType: "issue", issueId, projectId: issue.project_id });
-}
-
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
@@ -40,7 +29,38 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   await getAdmin().from("standup_report_tasks").delete().eq("standup_id", standup.id);
   if (items.length) {
     await getAdmin().from("standup_report_tasks").insert(items.map((c, i) => ({ standup_id: standup.id, issue_id: c.issue_id, completed: c.completed, order_index: i })));
-    for (const c of items) if (c.completed) await markIssueDone(c.issue_id, wsId, user.id).catch(() => {});
+
+    // Batch-sync completed issues to the board (was N+1).
+    const completedIds = items.filter((c) => c.completed).map((c) => c.issue_id);
+    if (completedIds.length) {
+      const { data: issues } = await getAdmin().from("issues").select("id, project_id").in("id", completedIds);
+      const projectIds = Array.from(new Set((issues || []).map((i: any) => i.project_id)));
+      const stateMap = new Map<string, string | null>();
+      for (const pid of projectIds) stateMap.set(pid, await getCompletedState(pid));
+
+      const now = new Date().toISOString();
+      const { data: updatedIssues } = await getAdmin().from("issues")
+        .update({ state_id: null, completed_at: now, updated_by: user.id })
+        .in("id", completedIds)
+        .select("id, project_id");
+
+      // Apply per-project completed state_id in bulk where known.
+      for (const [pid, stateId] of Array.from(stateMap.entries())) {
+        if (!stateId) continue;
+        const idsForProject = (updatedIssues || []).filter((i: any) => i.project_id === pid).map((i: any) => i.id);
+        if (idsForProject.length) {
+          await getAdmin().from("issues").update({ state_id: stateId }).in("id", idsForProject);
+        }
+      }
+
+      // Fire-and-forget activity events in parallel.
+      const projectIdMap = new Map((issues || []).map((i: any) => [i.id, i.project_id]));
+      await Promise.all(completedIds.map((issueId) => {
+        const projectId = projectIdMap.get(issueId);
+        if (!projectId) return Promise.resolve();
+        return writeActivity({ workspaceId: wsId, actorId: user.id, kind: "completed", targetType: "issue", issueId, projectId }).catch(() => {});
+      }));
+    }
   }
   return ok({ ok: true, submitted: !!submit });
 }

@@ -11,7 +11,8 @@ import { deriveIdentifier } from "@/lib/tasks";
 import { TasksIcon } from "@/components/icons";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Modal } from "@/components/ui/Modal";
+import { Drawer } from "@/components/ui/Drawer";
+import { SpinnerIcon } from "@/components/icons";
 import IssuePanel from "./issue-panel";
 import {
   KanbanColumn, DragPreviewCard, GROUPS, PRIORITIES, PRIO_META,
@@ -48,6 +49,8 @@ export default function IssuesPage() {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [showProj, setShowProj] = useState(false);
   const [newProjName, setNewProjName] = useState("");
+  const [creatingProj, setCreatingProj] = useState(false);
+  const [creatingIssue, setCreatingIssue] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [columns, setColumns] = useState<Record<Group, Issue[]>>(emptyColumns());
@@ -94,12 +97,15 @@ export default function IssuesPage() {
 
   async function createProject() {
     if (!newProjName.trim()) return;
-    const res = await fetch(`/api/workspaces/${wsSlug}/projects`, {
-      method: "POST", headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify({ name: newProjName }),
-    });
-    const json = await res.json();
-    if (json.success) { setProjects(p => [json.data, ...p]); setShowProj(false); setNewProjName(""); selectProject(json.data.id); }
+    setCreatingProj(true);
+    try {
+      const res = await fetch(`/api/workspaces/${wsSlug}/projects`, {
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({ name: newProjName }),
+      });
+      const json = await res.json();
+      if (json.success) { setProjects(p => [json.data, ...p]); setShowProj(false); setNewProjName(""); selectProject(json.data.id); }
+    } finally { setCreatingProj(false); }
   }
 
   const loadIssues = useCallback(async (slug?: string, pid?: string, pg?: number) => {
@@ -131,15 +137,18 @@ export default function IssuesPage() {
 
   async function createIssue() {
     if (!newName.trim()) return;
-    const res = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues`, {
-      method: "POST", headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify({ name: newName, priority: newPriority, assignee_ids: newAssigneeIds, is_bug: newBug }),
-    });
-    const json = await res.json();
-    if (json.success) {
-      setNewName(""); setNewBug(false); setNewAssigneeIds([]); setShowCreate(false);
-      setPage(1); setIssues(prev => [json.data, ...prev]); setTotal(t => t + 1);
-    }
+    setCreatingIssue(true);
+    try {
+      const res = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues`, {
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({ name: newName, priority: newPriority, assignee_ids: newAssigneeIds, is_bug: newBug }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setNewName(""); setNewBug(false); setNewAssigneeIds([]); setShowCreate(false);
+        setPage(1); setIssues(prev => [json.data, ...prev]); setTotal(t => t + 1);
+      }
+    } finally { setCreatingIssue(false); }
   }
 
   function toggleNewAssignee(uid: string) {
@@ -317,8 +326,8 @@ export default function IssuesPage() {
           )}
         </div>
         <div className="flex gap-2 flex-shrink-0">
-          <Button variant="secondary" size="sm" onClick={() => setShowProj(true)}>+ Project</Button>
-          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>+ New Task</Button>
+          <Button variant="secondary" size="sm" onClick={() => setShowProj(true)}>New Project</Button>
+          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>New Task</Button>
         </div>
       </div>
 
@@ -393,54 +402,61 @@ export default function IssuesPage() {
         </div>
       )}
 
-      {/* Create project modal */}
-      <Modal open={showProj} onClose={() => setShowProj(false)} title="New Project" description="Create a new project to organize tasks."
+      {/* Create project drawer */}
+      <Drawer open={showProj} onClose={() => setShowProj(false)} title="New Project" description="Create a new project to organize tasks."
         footer={<>
           <Button variant="secondary" size="sm" onClick={() => setShowProj(false)}>Cancel</Button>
-          <Button variant="primary" size="sm" onClick={createProject}>Create</Button>
-        </>}>
-        <div className="space-y-3">
-          <Input value={newProjName} onChange={e => setNewProjName(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && createProject()} placeholder="Project name" autoFocus />
-          <p className="text-xs text-text-tertiary">Code: <span className="font-mono font-medium text-text-secondary">{deriveIdentifier(newProjName.trim() || "General")}</span></p>
-        </div>
-      </Modal>
-
-      {/* Create issue modal */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Create Task" description="Add a new task to the current project." maxWidth="sm:max-w-lg"
-        footer={<>
-          <Button variant="secondary" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
-          <Button variant="primary" size="sm" onClick={createIssue}>Create</Button>
+          <Button variant="primary" size="sm" onClick={createProject} disabled={creatingProj || !newProjName.trim()}>
+            {creatingProj ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Creating...</span> : "Create project"}
+          </Button>
         </>}>
         <div className="space-y-4">
+          <Input label="Project name" value={newProjName} onChange={e => setNewProjName(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && createProject()} placeholder="e.g. Mobile App Redesign" autoFocus />
+          <div className="rounded-lg bg-surface-2 px-3 py-2.5">
+            <p className="text-xs text-text-tertiary font-light">Project code</p>
+            <p className="font-mono font-semibold text-text-secondary text-sm mt-0.5">{deriveIdentifier(newProjName.trim() || "General")}</p>
+          </div>
+        </div>
+      </Drawer>
+
+      {/* Create issue drawer */}
+      <Drawer open={showCreate} onClose={() => setShowCreate(false)} title="Create Task" description="Add a new task to the current project." initialWidth={560} maxWidth={720}
+        footer={<>
+          <Button variant="secondary" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+          <Button variant="primary" size="sm" onClick={createIssue} disabled={creatingIssue || !newName.trim()}>
+            {creatingIssue ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Creating...</span> : "Create task"}
+          </Button>
+        </>}>
+        <div className="space-y-5">
           <Input label="Task name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Fix login redirect"
             autoFocus onKeyDown={e => e.key === "Enter" && createIssue()} />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Priority</label>
+              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Priority</label>
               <select value={newPriority} onChange={e => setNewPriority(e.target.value)} className="select">
                 {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_META[p].label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">Type</label>
-              <label className="flex items-center gap-2 h-[38px] text-sm text-text-secondary cursor-pointer">
+              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Type</label>
+              <label className="flex items-center gap-2.5 h-[40px] text-sm text-text-secondary cursor-pointer">
                 <input type="checkbox" checked={newBug} onChange={e => setNewBug(e.target.checked)}
-                  className="rounded border-border text-primary focus:ring-primary-200" />
+                  className="size-4 rounded border-border text-primary focus:ring-primary-200" />
                 Mark as bug
               </label>
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Assignees</label>
-            <div className="flex flex-wrap gap-1.5">
-              {members.length === 0 && <p className="text-xs text-text-tertiary">No members yet.</p>}
+            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Assignees</label>
+            <div className="flex flex-wrap gap-2">
+              {members.length === 0 && <p className="text-xs text-text-tertiary font-light">No members yet.</p>}
               {members.map(m => {
                 const on = newAssigneeIds.includes(m.user_id);
                 return (
                   <button key={m.user_id} type="button" onClick={() => toggleNewAssignee(m.user_id)}
-                    className={`text-xs px-2.5 py-1.5 rounded-full border transition-all
-                      ${on ? "bg-primary-50 border-primary-300 text-primary font-medium dark:bg-primary-500/15 dark:border-primary-500/40" : "border-border text-text-secondary hover:bg-surface-2"}`}>
+                    className={`text-xs px-3 py-1.5 rounded-full border transition-all duration-150
+                      ${on ? "bg-primary-50 border-primary-300 text-primary font-medium dark:bg-primary-500/15 dark:border-primary-500/40" : "border-border text-text-secondary hover:bg-surface-2 hover:border-border-accent"}`}>
                     {m.profile?.display_name || m.user_id.slice(0, 6)}
                   </button>
                 );
@@ -448,7 +464,7 @@ export default function IssuesPage() {
             </div>
           </div>
         </div>
-      </Modal>
+      </Drawer>
 
       {/* Slide-over panel */}
       {selectedIssue && (

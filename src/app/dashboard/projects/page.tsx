@@ -7,9 +7,10 @@ import { useWorkspace } from "@/lib/hooks";
 import { CheckIcon, CloseIcon, FolderIcon } from "@/components/icons";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Modal } from "@/components/ui/Modal";
+import { Drawer } from "@/components/ui/Drawer";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner, EmptyState, ErrorState } from "@/components/ui/States";
+import { SpinnerIcon } from "@/components/icons";
 import { deriveIdentifier } from "@/lib/tasks";
 
 interface Project { id: string; name: string; identifier: string }
@@ -110,7 +111,7 @@ export default function ProjectsPage() {
           <h1 className="section-title">Projects</h1>
           <p className="section-desc">{projects.length} {projects.length === 1 ? "project" : "projects"} in this workspace</p>
         </div>
-        <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>+ New Project</Button>
+        <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>New Project</Button>
       </div>
 
       {msg && <div className="rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 px-3 py-2 text-sm text-red-600 dark:text-red-400 mb-4 animate-fade-in">{msg}</div>}
@@ -188,15 +189,23 @@ export default function ProjectsPage() {
         })}
       </div>
 
-      {/* Create project modal */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New Project" description="Create a new project to organize tasks."
-        footer={<><Button variant="secondary" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button><Button variant="primary" size="sm" onClick={createProject} disabled={busyId === "new"}>Create</Button></>}>
-        <div className="space-y-3">
+      {/* Create project drawer */}
+      <Drawer open={showCreate} onClose={() => setShowCreate(false)} title="New Project" description="Create a new project to organize tasks."
+        footer={<>
+          <Button variant="secondary" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+          <Button variant="primary" size="sm" onClick={createProject} disabled={busyId === "new" || !newName.trim()}>
+            {busyId === "new" ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Creating...</span> : "Create project"}
+          </Button>
+        </>}>
+        <div className="space-y-4">
           <Input label="Project name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Mobile App Redesign"
             autoFocus onKeyDown={(e) => e.key === "Enter" && createProject()} />
-          <p className="text-xs text-text-tertiary">Code: <span className="font-mono font-medium text-text-secondary">{deriveIdentifier(newName.trim() || "General")}</span></p>
+          <div className="rounded-lg bg-surface-2 px-3 py-2.5">
+            <p className="text-xs text-text-tertiary font-light">Project code</p>
+            <p className="font-mono font-semibold text-text-secondary text-sm mt-0.5">{deriveIdentifier(newName.trim() || "General")}</p>
+          </div>
         </div>
-      </Modal>
+      </Drawer>
 
       {/* Delete confirm */}
       <ConfirmDialog
@@ -205,6 +214,7 @@ export default function ProjectsPage() {
         message={`Delete "${deleteTarget?.name}"? This permanently removes all its tasks, comments, and access.`}
         confirmLabel="Delete"
         variant="danger"
+        loading={busyId === deleteTarget?.id}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
@@ -216,6 +226,7 @@ export default function ProjectsPage() {
         message={`Remove ${removeMemberTarget?.name} from this project?`}
         confirmLabel="Remove"
         variant="danger"
+        loading={memberBusy}
         onConfirm={confirmRemoveMember}
         onCancel={() => setRemoveMemberTarget(null)}
       />

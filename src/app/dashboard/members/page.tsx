@@ -6,6 +6,7 @@ import { ASSIGNABLE_ROLES, roleLabel } from "@/lib/tasks";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner, EmptyState } from "@/components/ui/States";
+import { SpinnerIcon } from "@/components/icons";
 
 interface Member { user_id: string; role: number; is_owner: boolean; profile: { display_name?: string } | null }
 interface Candidate { user_id: string; display_name: string }
@@ -105,7 +106,7 @@ export default function MembersPage() {
               <select value={addRole} onChange={(e) => setAddRole(Number(e.target.value))} className="select w-auto" aria-label="Select role">
                 {ASSIGNABLE_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
-              <Button variant="primary" size="sm" onClick={addMember} disabled={busy || !pick}>{busy ? "Adding..." : "Add"}</Button>
+              <Button variant="primary" size="sm" onClick={addMember} disabled={busy || !pick}>{busy ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Adding...</span> : "Add"}</Button>
             </div>
           )}
         </div>
@@ -169,7 +170,7 @@ export default function MembersPage() {
               <option value="">Select a member...</option>
               {managerCandidates.map((m) => <option key={m.user_id} value={m.user_id}>{m.profile?.display_name || m.user_id.slice(0, 8)}</option>)}
             </select>
-            <Button variant="primary" size="sm" onClick={addStandupManager} disabled={managerBusy || !managerPick}>{managerBusy ? "..." : "Add"}</Button>
+            <Button variant="primary" size="sm" onClick={addStandupManager} disabled={managerBusy || !managerPick}>{managerBusy ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Adding...</span> : "Add"}</Button>
           </div>
         )}
       </div>
@@ -180,6 +181,7 @@ export default function MembersPage() {
         message={`Remove ${removeTarget?.name} from the workspace?`}
         confirmLabel="Remove"
         variant="danger"
+        loading={busy}
         onConfirm={confirmRemove}
         onCancel={() => setRemoveTarget(null)}
       />

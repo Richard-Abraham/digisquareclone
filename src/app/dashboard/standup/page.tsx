@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import { useWorkspace } from "@/lib/hooks";
-import { CheckIcon } from "@/components/icons";
+import { CheckIcon, SpinnerIcon } from "@/components/icons";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { Spinner, EmptyState } from "@/components/ui/States";
@@ -152,7 +152,7 @@ export default function StandupPage() {
                 ))}
               </div>
               <Button variant="secondary" size="sm" onClick={savePlan} disabled={savingPlan} className="mt-4">
-                {savingPlan ? "Saving..." : "Save plan"}
+                {savingPlan ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Saving...</span> : "Save plan"}
               </Button>
             </div>
 
@@ -188,9 +188,11 @@ export default function StandupPage() {
               </div>
               {!submitted && (
                 <div className="flex flex-wrap gap-2 mt-4">
-                  <Button variant="secondary" size="sm" onClick={() => saveReport(false)} disabled={savingReport}>Save draft</Button>
+                  <Button variant="secondary" size="sm" onClick={() => saveReport(false)} disabled={savingReport}>
+                    {savingReport ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Saving...</span> : "Save draft"}
+                  </Button>
                   <Button variant="primary" size="sm" onClick={() => saveReport(true)} disabled={savingReport || !report.trim()}>
-                    {savingReport ? "Submitting..." : "Submit report"}
+                    {savingReport ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Submitting...</span> : "Submit report"}
                   </Button>
                 </div>
               )}

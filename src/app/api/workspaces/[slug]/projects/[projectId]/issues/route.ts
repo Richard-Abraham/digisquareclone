@@ -24,9 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const offset = (page - 1) * pageSize;
 
   // Pre-resolve filters that need junction tables so they apply BEFORE pagination.
-  // C4 fix: tag filter was applied after pagination, breaking counts and paging.
-  // C5 fix: assignee filter only matched primary assignee, missing multi-assignee issues.
-  const preFilterIds = new Set<string | null>([null]); // null = no pre-filter
+  const preFilterIds = new Set<string | null>([null]);
   let preFilterIntersection: Set<string> | null = null;
 
   if (tag) {
@@ -36,11 +34,9 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   }
 
   if (assignee) {
-    // Fetch issue_ids where the user is a multi-assignee (issue_assignees).
     const { data: assigneeRows } = await getAdmin().from("issue_assignees").select("issue_id").eq("user_id", assignee);
     const multiIds = new Set((assigneeRows || []).map((r: any) => r.issue_id as string));
     if (preFilterIntersection) {
-      // Intersect with existing pre-filter
       for (const id of Array.from(preFilterIntersection)) if (!multiIds.has(id)) preFilterIntersection.delete(id);
     } else {
       preFilterIntersection = multiIds;
@@ -55,7 +51,6 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   if (priority) q = q.eq("priority", priority);
   if (search) q = q.ilike("name", `%${search}%`);
   if (bugs === "true") q = q.eq("is_bug", true);
-  // Apply junction-table filters via .in() so they participate in count + pagination.
   if (preFilterIntersection !== null) {
     const ids = Array.from(preFilterIntersection);
     if (ids.length === 0) return ok({ issues: [], total: 0, page, pageSize });
@@ -67,11 +62,9 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
   let rows = data || [];
 
-  // Enrich assignees (multi) + primary assignee + creator with profiles.
   const userIds = Array.from(new Set(rows.flatMap((i: any) => [
     i.assignee_id, i.created_by, ...(i.assignees || []).map((a: any) => a.user_id),
   ]).filter(Boolean)));
-  // P4 fix: only select display_name (was select("*") fetching avatar_url, created_at, etc).
   const { data: profiles } = userIds.length ? await getAdmin().from("profiles").select("user_id, display_name").in("user_id", userIds) : { data: [] };
   const pm = new Map((profiles || []).map((p: any) => [p.user_id, p]));
   const enriched = rows.map((i: any) => ({
@@ -96,7 +89,6 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const { data: project } = await getAdmin().from("projects").select("workspace_id").eq("id", params.projectId).single();
   if (!project) return err("Project not found", 404);
 
-  const { data: ds } = await getAdmin().from("states").select("id").eq("project_id", params.projectId).eq("is_default", true).single();
   const body = await req.json() as {
     name?: string; description_html?: string; priority?: string; state_id?: string;
     assignee_id?: string; assignee_ids?: string[]; reviewer_ids?: string[]; tag_ids?: string[];
@@ -108,28 +100,30 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const reviewerIds = Array.from(new Set(body.reviewer_ids || []));
   const tagIds = Array.from(new Set(body.tag_ids || []));
 
-  const { data: seq } = await getAdmin().from("issue_sequences").select("sequence").eq("project_id", params.projectId).order("sequence", { ascending: false }).limit(1);
-  const nextSeq = (seq?.[0]?.sequence ?? 0) + 1;
+  // R1 + R2: atomic issue creation via PostgreSQL function (transaction + serialized sequence).
+  const { data: issue, error: ie } = await getAdmin().rpc("create_issue_atomic", {
+    p_project_id: params.projectId,
+    p_workspace_id: project.workspace_id,
+    p_name: body.name.trim(),
+    p_description_html: body.description_html || "<p></p>",
+    p_priority: body.priority || "none",
+    p_state_id: body.state_id || null,
+    p_assignee_id: assigneeIds[0] || null,
+    p_is_bug: !!body.is_bug,
+    p_created_by: user.id,
+    p_start_date: body.start_date || null,
+    p_target_date: body.target_date || null,
+    p_parent_id: body.parent_id || null,
+    p_assignee_ids: assigneeIds,
+    p_reviewer_ids: reviewerIds,
+    p_tag_ids: tagIds,
+  });
 
-  const { data: issue, error: ie } = await getAdmin().from("issues").insert({
-    project_id: params.projectId, workspace_id: project.workspace_id, name: body.name,
-    description_html: body.description_html || "<p></p>", priority: body.priority || "none",
-    state_id: body.state_id || ds?.id || null, assignee_id: assigneeIds[0] || null,
-    is_bug: !!body.is_bug, created_by: user.id, updated_by: user.id, sequence_id: nextSeq,
-    sort_order: nextSeq,
-    start_date: body.start_date || null, target_date: body.target_date || null, parent_id: body.parent_id || null,
-  }).select("*, state:states(*)").single();
   if (ie) return err(ie.message, 400);
 
-  await getAdmin().from("issue_sequences").insert({ project_id: params.projectId, issue_id: issue.id, sequence: nextSeq });
-  if (assigneeIds.length) await getAdmin().from("issue_assignees").insert(assigneeIds.map((uid) => ({ issue_id: issue.id, user_id: uid })));
-  if (reviewerIds.length) await getAdmin().from("issue_reviewers").insert(reviewerIds.map((uid) => ({ issue_id: issue.id, user_id: uid, state: "pending" })));
-  if (tagIds.length) await getAdmin().from("issue_tags").insert(tagIds.map((tid) => ({ issue_id: issue.id, tag_id: tid })));
-
-  // Assigning/reviewing grants project access; the creator is always a member too.
+  // Grant project access and notify recipients (outside the DB transaction).
   await ensureProjectMembers(params.projectId, [user.id, ...assigneeIds, ...reviewerIds]);
 
-  // Notify the people this task lands on.
   await writeNotifications(assigneeIds, {
     workspaceId: project.workspace_id, actorId: user.id,
     kind: assignmentNotificationKind(!!body.is_bug), issueId: issue.id, projectId: params.projectId, snippet: body.name,
