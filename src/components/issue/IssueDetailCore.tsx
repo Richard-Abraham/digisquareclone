@@ -114,8 +114,18 @@ export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: extern
     }
   }, [externalIssue?.id, externalIssue?.name, externalIssue?.state_id, externalIssue?.priority, externalIssue?.target_date, externalIssue?.is_bug]);
 
+  useEffect(() => { if (externalMembers) setMembers(externalMembers); }, [externalMembers]);
+  useEffect(() => { if (externalActivity) setActivity(externalActivity); }, [externalActivity]);
+
   function assigneeIds(): string[] {
     return (issue?.assignees || []).map((a) => a.user_id!).filter(Boolean);
+  }
+
+  function memberDisplayName(m: Member): string {
+    if (m.profile?.display_name) return m.profile.display_name;
+    const a = (issue?.assignees || []).find((a) => a.user_id === m.user_id);
+    if (a?.display_name) return a.display_name;
+    return "User";
   }
 
   async function toggleAssignee(uid: string) {
@@ -312,7 +322,7 @@ export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: extern
               <button key={m.user_id} onClick={() => toggleAssignee(m.user_id)}
                 className={`text-xs px-2.5 py-1.5 rounded-full border transition-all
                   ${on ? "bg-primary-50 border-primary-300 text-primary font-medium" : "border-border text-text-secondary hover:bg-surface-2"}`}>
-                {m.profile?.display_name || m.user_id.slice(0, 6)}
+                {memberDisplayName(m)}
               </button>
             );
           })}
