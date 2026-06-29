@@ -7,6 +7,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useAuth } from "@/lib/providers";
+import { api } from "@/lib/api";
 import { deriveIdentifier } from "@/lib/tasks";
 import { TasksIcon } from "@/components/icons";
 import { Button } from "@/components/ui/Button";
@@ -56,42 +57,36 @@ export default function IssuesPage() {
   const [columns, setColumns] = useState<Record<Group, Issue[]>>(emptyColumns());
   const router = useRouter();
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
-
   useEffect(() => {
     if (!ready) return;
     if (!user) { router.push("/login"); return; }
-    if (!token) { router.push("/login"); return; }
     loadAll();
   }, [ready]);
 
   async function loadAll() {
-    const wsRes = await fetch("/api/workspaces", { headers: authHeaders });
-    const wsJson = await wsRes.json();
-    if (!wsJson.success || !wsJson.data.length) { setLoading(false); return; }
-    const slug = wsJson.data[0].slug;
-    setWsSlug(slug);
-    const projRes = await fetch(`/api/workspaces/${slug}/projects`, { headers: authHeaders });
-    const projJson = await projRes.json();
-    if (!projJson.success || !projJson.data.length) { setLoading(false); return; }
-    setProjects(projJson.data);
-    const lastPid = localStorage.getItem(`lastProject:${slug}`);
-    const pid = (lastPid && projJson.data.some((p: any) => p.id === lastPid)) ? lastPid : projJson.data[0].id;
-    setProjId(pid);
-    await Promise.all([
-      fetch(`/api/workspaces/${slug}/members`, { headers: authHeaders }).then(r => r.json()).then(j => { if (j.success) setMembers((j.data.members || []).map((m: any) => ({ user_id: m.user_id, profile: m.profile }))); }),
-      fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { headers: authHeaders }).then(r => r.json()).then(j => { if (j.success) setStates(j.data); }),
-      loadIssues(slug, pid),
-    ]);
+    try {
+      const ws = await api<{ slug: string }[]>("/api/workspaces");
+      if (!ws.length) { setLoading(false); return; }
+      const slug = ws[0].slug;
+      setWsSlug(slug);
+      const proj = await api<{ id: string; name: string }[]>(`/api/workspaces/${slug}/projects`);
+      if (!proj.length) { setLoading(false); return; }
+      setProjects(proj);
+      const lastPid = localStorage.getItem(`lastProject:${slug}`);
+      const pid = (lastPid && proj.some((p) => p.id === lastPid)) ? lastPid : proj[0].id;
+      setProjId(pid);
+      await Promise.all([
+        api<{ members: { user_id: string; profile: { display_name: string } | null }[] }>(`/api/workspaces/${slug}/members`).then(r => setMembers(r.members.map((m: any) => ({ user_id: m.user_id, profile: m.profile })))),
+        api<State[]>(`/api/workspaces/${slug}/projects/${pid}/states`).then(setStates),
+        loadIssues(slug, pid),
+      ]);
+    } catch { setLoading(false); }
   }
 
   async function selectProject(pid: string, slug = wsSlug) {
     setProjId(pid); setPage(1);
     localStorage.setItem(`lastProject:${slug}`, pid);
-    const sRes = await fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { headers: authHeaders });
-    const sJson = await sRes.json();
-    if (sJson.success) setStates(sJson.data);
+    try { setStates(await api<State[]>(`/api/workspaces/${slug}/projects/${pid}/states`)); } catch {}
     await loadIssues(slug, pid);
   }
 
@@ -99,12 +94,8 @@ export default function IssuesPage() {
     if (!newProjName.trim()) return;
     setCreatingProj(true);
     try {
-      const res = await fetch(`/api/workspaces/${wsSlug}/projects`, {
-        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({ name: newProjName }),
-      });
-      const json = await res.json();
-      if (json.success) { setProjects(p => [json.data, ...p]); setShowProj(false); setNewProjName(""); selectProject(json.data.id); }
+      const p = await api<{ id: string }>(`/api/workspaces/${wsSlug}/projects`, { method: "POST", body: { name: newProjName } });
+      setProjects(prev => [p as any, ...prev]); setShowProj(false); setNewProjName(""); selectProject(p.id);
     } finally { setCreatingProj(false); }
   }
 
@@ -117,11 +108,11 @@ export default function IssuesPage() {
     if (filterSearch) params.set("search", filterSearch);
     params.set("page", String(pg || page));
     params.set("pageSize", String(PAGE_SIZE));
-    const res = await fetch(`/api/workspaces/${s}/projects/${p}/issues?${params}`, { headers: authHeaders });
-    const json = await res.json();
-    if (json.success) { setIssues(json.data.issues); setTotal(json.data.total); }
-    setLoading(false);
-  }, [wsSlug, projId, filterState, filterPriority, filterAssignee, filterSearch, page, authHeaders]);
+    try {
+      const res = await api<{ issues: Issue[]; total: number }>(`/api/workspaces/${s}/projects/${p}/issues?${params}`);
+      setIssues(res.issues); setTotal(res.total);
+    } catch {} finally { setLoading(false); }
+  }, [wsSlug, projId, filterState, filterPriority, filterAssignee, filterSearch, page]);
 
   useEffect(() => { if (wsSlug && projId) { setPage(1); loadIssues(); } }, [filterState, filterPriority, filterAssignee, filterSearch]);
   useEffect(() => { if (wsSlug && projId) loadIssues(); }, [page]);
@@ -139,16 +130,12 @@ export default function IssuesPage() {
     if (!newName.trim()) return;
     setCreatingIssue(true);
     try {
-      const res = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues`, {
-        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({ name: newName, priority: newPriority, assignee_ids: newAssigneeIds, is_bug: newBug }),
+      const issue = await api<Issue>(`/api/workspaces/${wsSlug}/projects/${projId}/issues`, {
+        method: "POST", body: { name: newName, priority: newPriority, assignee_ids: newAssigneeIds, is_bug: newBug },
       });
-      const json = await res.json();
-      if (json.success) {
-        setNewName(""); setNewBug(false); setNewAssigneeIds([]); setShowCreate(false);
-        setPage(1); setIssues(prev => [json.data, ...prev]); setTotal(t => t + 1);
-      }
-    } finally { setCreatingIssue(false); }
+      setNewName(""); setNewBug(false); setNewAssigneeIds([]); setShowCreate(false);
+      setPage(1); setIssues(prev => [issue, ...prev]); setTotal(t => t + 1);
+    } catch {} finally { setCreatingIssue(false); }
   }
 
   function toggleNewAssignee(uid: string) {
@@ -271,19 +258,13 @@ export default function IssuesPage() {
 
     try {
       if (stateChanged && targetState) {
-        const r = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${movedId}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders },
-          body: JSON.stringify({ state_id: targetState.id }),
+        await api(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${movedId}`, {
+          method: "PATCH", body: { state_id: targetState.id },
         });
-        const j = await r.json();
-        if (!j.success) throw new Error(j.error);
       }
-      const r = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues/reorder`, {
-        method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({ items: newOrder }),
+      await api(`/api/workspaces/${wsSlug}/projects/${projId}/issues/reorder`, {
+        method: "PATCH", body: { items: newOrder },
       });
-      const j = await r.json();
-      if (!j.success) throw new Error(j.error);
     } catch {
       setIssues(prevIssues); // rollback (re-derives columns)
     }

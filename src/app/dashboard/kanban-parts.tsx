@@ -3,7 +3,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { BugIcon, GripIcon } from "@/components/icons";
-import { cn } from "@/lib/cn";
+import clsx from "clsx";
 
 export interface Issue {
   id: string; name: string; priority: string; sequence_id: number; is_bug?: boolean;
@@ -85,7 +85,7 @@ export function KanbanCard({ issue, stateColor, onOpen }: KanbanCardProps) {
       {...attributes}
       {...listeners}
       onClick={() => onOpen(issue.id)}
-      className={cn(
+      className={clsx(
         "card p-3 cursor-grab active:cursor-grabbing transition-all duration-150 hover:shadow-elevated hover:-translate-y-0.5 border-l-[3px] group relative",
         isDragging && "opacity-40"
       )}
@@ -120,7 +120,7 @@ export function KanbanColumn({ group, items, stateInfo, droppable, activeId, onO
   const showDropHere = activeId !== null && items.length === 0;
   return (
     <div
-      className={cn(
+      className={clsx(
         "min-w-[260px] snap-start rounded-xl p-3 transition-all duration-200",
         isOver && droppable ? "bg-primary-50 ring-2 ring-primary-300 dark:bg-primary-500/10" : "bg-surface-2"
       )}
@@ -140,7 +140,7 @@ export function KanbanColumn({ group, items, stateInfo, droppable, activeId, onO
         </SortableContext>
         {items.length === 0 && (
           <div
-            className={cn(
+            className={clsx(
               "text-xs text-center py-6 rounded-lg border-2 border-dashed transition-colors",
               isOver && droppable ? "border-primary-300 bg-primary-50/50 text-primary dark:bg-primary-500/10" : showDropHere ? "border-border-accent text-text-tertiary" : "border-border text-text-tertiary"
             )}

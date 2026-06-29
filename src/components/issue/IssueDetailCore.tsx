@@ -19,7 +19,22 @@ interface CoreIssue {
   created_at: string;
   created_by: string;
   creator?: { display_name?: string } | null;
+  assignees?: { user_id?: string; display_name?: string }[];
   state: State | null;
+}
+
+interface ActivityEvent {
+  id: string;
+  kind: string;
+  created_at: string;
+  snippet: string | null;
+  actor: { display_name?: string } | null;
+  metadata: any;
+}
+
+interface Member {
+  user_id: string;
+  profile: { display_name: string } | null;
 }
 
 interface IssueDetailCoreProps {
@@ -28,6 +43,8 @@ interface IssueDetailCoreProps {
   projId: string;
   states: State[];
   issue?: CoreIssue | null;
+  members?: Member[];
+  activity?: ActivityEvent[];
   onIssueUpdated?: (issue: CoreIssue) => void;
   compact?: boolean;
 }
@@ -48,7 +65,7 @@ function fmtDuration(seconds: number): string {
   return `${m}m`;
 }
 
-export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: externalIssue, onIssueUpdated, compact = false }: IssueDetailCoreProps) {
+export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: externalIssue, members: externalMembers, activity: externalActivity, onIssueUpdated, compact = false }: IssueDetailCoreProps) {
   const base = `/api/workspaces/${wsSlug}/projects/${projId}/issues/${issueId}`;
   const [issue, setIssue] = useState<CoreIssue | null>(externalIssue ?? null);
   const [loading, setLoading] = useState(!externalIssue);
@@ -66,11 +83,15 @@ export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: extern
   const [depResults, setDepResults] = useState<Dep[]>([]);
   const [depBusy, setDepBusy] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [members, setMembers] = useState<Member[]>(externalMembers ?? []);
+  const [activity, setActivity] = useState<ActivityEvent[]>(externalActivity ?? []);
 
   const loadIssue = useCallback(async () => {
     try {
-      const b = await api<{ issue: CoreIssue }>(`${base}/detail`);
+      const b = await api<{ issue: CoreIssue; members: Member[]; activity: ActivityEvent[] }>(`${base}/detail`);
       setIssue(b.issue);
+      setMembers(b.members);
+      setActivity(b.activity);
       setEditName(b.issue.name);
       setEditState(b.issue.state_id || "");
       setEditPriority(b.issue.priority);
@@ -92,6 +113,20 @@ export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: extern
       setEditBug(externalIssue.is_bug);
     }
   }, [externalIssue?.id, externalIssue?.name, externalIssue?.state_id, externalIssue?.priority, externalIssue?.target_date, externalIssue?.is_bug]);
+
+  function assigneeIds(): string[] {
+    return (issue?.assignees || []).map((a) => a.user_id!).filter(Boolean);
+  }
+
+  async function toggleAssignee(uid: string) {
+    const cur = assigneeIds();
+    const next = cur.includes(uid) ? cur.filter((x) => x !== uid) : [...cur, uid];
+    setIssue((prev) => prev ? { ...prev, assignees: next.map((id) => ({ user_id: id })) } : prev);
+    await api(`${base}/assignees`, { method: "PUT", body: { user_ids: next } });
+    const updated = await api<CoreIssue>(base);
+    setIssue(updated);
+    onIssueUpdated?.(updated);
+  }
 
   async function loadTime() {
     try {
@@ -251,6 +286,57 @@ export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: extern
             </div>
           )}
         </div>
+      </div>
+
+      {/* Creator */}
+      {issue.creator && (
+        <div className={`card ${compact ? "p-4" : "p-5"}`}>
+          <h4 className={labelClass}>Created by</h4>
+          <p className="text-sm text-text-primary font-medium">
+            {issue.creator.display_name || "Unknown"}
+          </p>
+          <p className="text-[11px] text-text-tertiary mt-0.5">
+            {new Date(issue.created_at).toLocaleString()}
+          </p>
+        </div>
+      )}
+
+      {/* Assignees */}
+      <div className={`card ${compact ? "p-4" : "p-5"}`}>
+        <h4 className={labelClass}>Assignees</h4>
+        <div className="flex flex-wrap gap-1.5">
+          {members.length === 0 && <p className="text-xs text-text-tertiary">No members loaded</p>}
+          {members.map((m) => {
+            const on = assigneeIds().includes(m.user_id);
+            return (
+              <button key={m.user_id} onClick={() => toggleAssignee(m.user_id)}
+                className={`text-xs px-2.5 py-1.5 rounded-full border transition-all
+                  ${on ? "bg-primary-50 border-primary-300 text-primary font-medium" : "border-border text-text-secondary hover:bg-surface-2"}`}>
+                {m.profile?.display_name || m.user_id.slice(0, 6)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Activity */}
+      <div className={`card ${compact ? "p-4" : "p-5"}`}>
+        <h4 className={labelClass}>Activity</h4>
+        {activity.length > 0 ? (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {activity.map((a) => (
+              <div key={a.id} className="flex items-center gap-2 text-sm text-text-secondary py-1">
+                <div className="size-1.5 rounded-full bg-text-tertiary flex-shrink-0" />
+                <span className="text-[10px] text-text-tertiary font-mono">{new Date(a.created_at).toLocaleString()}</span>
+                <span className="font-semibold text-text-primary">{a.actor?.display_name || "Someone"}</span>
+                <span>{a.kind.replace(/_/g, " ")}</span>
+                {a.metadata?.to && <span className="text-text-tertiary">&rarr; {a.metadata.to}</span>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-text-tertiary text-center py-4">No activity recorded yet.</p>
+        )}
       </div>
     </div>
   );

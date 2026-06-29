@@ -1,5 +1,5 @@
 "use client";
-import { cn } from "@/lib/cn";
+import clsx from "clsx";
 
 interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   name?: string;
@@ -14,12 +14,12 @@ const sizeClass = {
 
 export function Avatar({ name, size = "md", className, children, ...props }: AvatarProps) {
   return (
-    <div className={cn(sizeClass[size], className)} {...props}>
+    <div className={clsx(sizeClass[size], className)} {...props}>
       {children || name?.[0]?.toUpperCase() || "?"}
     </div>
   );
 }
 
 export function AvatarGroup({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("avatar-group", className)}>{children}</div>;
+  return <div className={clsx("avatar-group", className)}>{children}</div>;
 }
