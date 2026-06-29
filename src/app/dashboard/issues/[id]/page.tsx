@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useRealtimeIssues } from "@/lib/realtime";
 import { BugIcon, CheckIcon, CloseIcon, SpinnerIcon } from "@/components/icons";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IssueDetailCore } from "@/components/issue/IssueDetailCore";
@@ -49,12 +50,9 @@ function IssueDetailPageContent() {
   const [commentBusy, setCommentBusy] = useState(false);
   const [reviewerBusy, setReviewerBusy] = useState(false);
 
-  const { issue, states, members, tags, subtasks, comments, reviewers, activity, me } = bundle || {};
+  useRealtimeIssues({ enabled: true });
 
-  // M5 fix: move auth check to useEffect (was router.push during render — React anti-pattern).
-  useEffect(() => {
-    if (typeof window !== "undefined" && !localStorage.getItem("token")) router.push("/login");
-  }, [router]);
+  const { issue, states, members, tags, subtasks, comments, reviewers, activity, me } = bundle || {};
 
   const loadData = useCallback(async () => {
     const b = await api<DetailBundle>(detailUrl);
@@ -120,10 +118,6 @@ function IssueDetailPageContent() {
     const updated = await api<Reviewer[]>(`${base}/reviewers`);
     setBundle(prev => prev ? { ...prev, reviewers: updated } : prev);
   }
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && !localStorage.getItem("token")) router.push("/login");
-  }, [router]);
 
   if (loading) return (
     <div className="flex h-full items-center justify-center">

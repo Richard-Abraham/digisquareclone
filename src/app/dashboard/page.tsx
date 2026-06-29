@@ -8,6 +8,7 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useAuth } from "@/lib/providers";
 import { deriveIdentifier } from "@/lib/tasks";
+import { useRealtimeIssues } from "@/lib/realtime";
 import { TasksIcon } from "@/components/icons";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -56,23 +57,21 @@ export default function IssuesPage() {
   const [columns, setColumns] = useState<Record<Group, Issue[]>>(emptyColumns());
   const router = useRouter();
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+  useRealtimeIssues({ enabled: !!projId });
 
   useEffect(() => {
     if (!ready) return;
     if (!user) { router.push("/login"); return; }
-    if (!token) { router.push("/login"); return; }
     loadAll();
   }, [ready]);
 
   async function loadAll() {
-    const wsRes = await fetch("/api/workspaces", { headers: authHeaders });
+    const wsRes = await fetch("/api/workspaces", { credentials: "same-origin" });
     const wsJson = await wsRes.json();
     if (!wsJson.success || !wsJson.data.length) { setLoading(false); return; }
     const slug = wsJson.data[0].slug;
     setWsSlug(slug);
-    const projRes = await fetch(`/api/workspaces/${slug}/projects`, { headers: authHeaders });
+    const projRes = await fetch(`/api/workspaces/${slug}/projects`, { credentials: "same-origin" });
     const projJson = await projRes.json();
     if (!projJson.success || !projJson.data.length) { setLoading(false); return; }
     setProjects(projJson.data);
@@ -80,8 +79,8 @@ export default function IssuesPage() {
     const pid = (lastPid && projJson.data.some((p: any) => p.id === lastPid)) ? lastPid : projJson.data[0].id;
     setProjId(pid);
     await Promise.all([
-      fetch(`/api/workspaces/${slug}/members`, { headers: authHeaders }).then(r => r.json()).then(j => { if (j.success) setMembers((j.data.members || []).map((m: any) => ({ user_id: m.user_id, profile: m.profile }))); }),
-      fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { headers: authHeaders }).then(r => r.json()).then(j => { if (j.success) setStates(j.data); }),
+      fetch(`/api/workspaces/${slug}/members`, { credentials: "same-origin" }).then(r => r.json()).then(j => { if (j.success) setMembers((j.data.members || []).map((m: any) => ({ user_id: m.user_id, profile: m.profile }))); }),
+      fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { credentials: "same-origin" }).then(r => r.json()).then(j => { if (j.success) setStates(j.data); }),
       loadIssues(slug, pid),
     ]);
   }
@@ -89,7 +88,7 @@ export default function IssuesPage() {
   async function selectProject(pid: string, slug = wsSlug) {
     setProjId(pid); setPage(1);
     localStorage.setItem(`lastProject:${slug}`, pid);
-    const sRes = await fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { headers: authHeaders });
+    const sRes = await fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { credentials: "same-origin" });
     const sJson = await sRes.json();
     if (sJson.success) setStates(sJson.data);
     await loadIssues(slug, pid);
@@ -100,7 +99,7 @@ export default function IssuesPage() {
     setCreatingProj(true);
     try {
       const res = await fetch(`/api/workspaces/${wsSlug}/projects`, {
-        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders },
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
         body: JSON.stringify({ name: newProjName }),
       });
       const json = await res.json();
@@ -117,11 +116,11 @@ export default function IssuesPage() {
     if (filterSearch) params.set("search", filterSearch);
     params.set("page", String(pg || page));
     params.set("pageSize", String(PAGE_SIZE));
-    const res = await fetch(`/api/workspaces/${s}/projects/${p}/issues?${params}`, { headers: authHeaders });
+    const res = await fetch(`/api/workspaces/${s}/projects/${p}/issues?${params}`, { credentials: "same-origin" });
     const json = await res.json();
     if (json.success) { setIssues(json.data.issues); setTotal(json.data.total); }
     setLoading(false);
-  }, [wsSlug, projId, filterState, filterPriority, filterAssignee, filterSearch, page, authHeaders]);
+  }, [wsSlug, projId, filterState, filterPriority, filterAssignee, filterSearch, page]);
 
   useEffect(() => { if (wsSlug && projId) { setPage(1); loadIssues(); } }, [filterState, filterPriority, filterAssignee, filterSearch]);
   useEffect(() => { if (wsSlug && projId) loadIssues(); }, [page]);
@@ -140,7 +139,7 @@ export default function IssuesPage() {
     setCreatingIssue(true);
     try {
       const res = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues`, {
-        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders },
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
         body: JSON.stringify({ name: newName, priority: newPriority, assignee_ids: newAssigneeIds, is_bug: newBug }),
       });
       const json = await res.json();
@@ -272,14 +271,14 @@ export default function IssuesPage() {
     try {
       if (stateChanged && targetState) {
         const r = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${movedId}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders },
+          method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
           body: JSON.stringify({ state_id: targetState.id }),
         });
         const j = await r.json();
         if (!j.success) throw new Error(j.error);
       }
       const r = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues/reorder`, {
-        method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders },
+        method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
         body: JSON.stringify({ items: newOrder }),
       });
       const j = await r.json();

@@ -3,7 +3,9 @@ import { z } from "zod";
 const envSchema = z.object({
   SUPABASE_URL: z.string().url("SUPABASE_URL must be a valid URL"),
   SUPABASE_SERVICE_KEY: z.string().min(1, "SUPABASE_SERVICE_KEY is required"),
-  SUPABASE_ANON_KEY: z.string().min(1, "SUPABASE_ANON_KEY is required"),
+  SUPABASE_ANON_KEY: z.string().optional(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional(),
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
   // Optional: SMTP/Resend for password reset and notification emails
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),
@@ -28,3 +30,9 @@ function validateEnv(): Env {
 }
 
 export const env = validateEnv();
+
+// Client-safe subset (must be NEXT_PUBLIC_*)
+export const clientEnv = {
+  SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL,
+  SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || "",
+};

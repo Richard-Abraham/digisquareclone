@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useRealtimeNotifications } from "@/lib/realtime";
 import { PinIcon, BugIcon, EyeIcon, BellIcon, CheckCircleIcon } from "@/components/icons";
 import { Spinner, EmptyState } from "@/components/ui/States";
 import type { ReactNode } from "react";
@@ -19,6 +20,7 @@ const KIND_META: Record<string, { icon: ReactNode; verb: string }> = {
 };
 
 export default function NotificationsPage() {
+  useRealtimeNotifications({ enabled: true });
   const [items, setItems] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
 
