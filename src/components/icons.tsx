@@ -193,6 +193,14 @@ export function ArrowRightIcon(props: { size?: number; className?: string }) {
   );
 }
 
+export function ArrowLeftIcon(props: { size?: number; className?: string }) {
+  return (
+    <svg {...base()} width={props.size ?? 18} height={props.size ?? 18} className={props.className}>
+      <path d="M19 12H5M11 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
 export function SparklesIcon(props: { size?: number; className?: string }) {
   return (
     <svg {...base()} width={props.size ?? 18} height={props.size ?? 18} className={props.className}>

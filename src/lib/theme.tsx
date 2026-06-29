@@ -17,6 +17,8 @@ const ThemeContext = createContext<ThemeState>({
 
 export const useTheme = () => useContext(ThemeContext);
 
+import { logger } from "./logger";
+
 const STORAGE_KEY = "digisystem-theme";
 
 function applyTheme(theme: Theme) {
@@ -29,24 +31,28 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
-    const stored = (typeof window !== "undefined" && localStorage.getItem(STORAGE_KEY)) as Theme | null;
-    const prefersDark = typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial: Theme = stored || (prefersDark ? "dark" : "light");
-    setThemeState(initial);
-    applyTheme(initial);
+    try {
+      const stored = (typeof window !== "undefined" && localStorage.getItem(STORAGE_KEY)) as Theme | null;
+      const prefersDark = typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const initial: Theme = stored || (prefersDark ? "dark" : "light");
+      setThemeState(initial);
+      applyTheme(initial);
+    } catch (e) {
+      logger.warn("failed to read theme preference", undefined, e);
+    }
   }, []);
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
     applyTheme(t);
-    try { localStorage.setItem(STORAGE_KEY, t); } catch {}
+    try { localStorage.setItem(STORAGE_KEY, t); } catch (e) { logger.warn("failed to persist theme", undefined, e); }
   }, []);
 
   const toggle = useCallback(() => {
     setThemeState((cur) => {
       const next: Theme = cur === "dark" ? "light" : "dark";
       applyTheme(next);
-      try { localStorage.setItem(STORAGE_KEY, next); } catch {}
+      try { localStorage.setItem(STORAGE_KEY, next); } catch (e) { logger.warn("failed to persist theme", undefined, e); }
       return next;
     });
   }, []);

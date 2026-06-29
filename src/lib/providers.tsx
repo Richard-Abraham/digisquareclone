@@ -2,10 +2,10 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { getToken } from "./api";
+import { logger } from "./logger";
 
 interface User { id: string; email: string; }
-interface Profile { display_name: string; avatar?: string; }
+interface Profile { display_name: string; avatar?: string | null; }
 
 interface AuthState {
   user: User | null;
@@ -39,25 +39,24 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const refresh = useCallback(async () => {
-    const token = getToken();
-    if (!token) { setUser(null); setProfile(null); setReady(true); return; }
     try {
-      const res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch("/api/auth/me", { credentials: "same-origin" });
       const json = await res.json();
       if (!json.success) {
-        localStorage.removeItem("token");
         router.push("/login");
         return;
       }
       setUser(json.data.user);
       setProfile(json.data.profile);
       const bootKey = `bootstrapped:${json.data.user.id}`;
-      if (!localStorage.getItem(bootKey)) {
-        await fetch("/api/bootstrap", { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+      if (typeof window !== "undefined" && !localStorage.getItem(bootKey)) {
+        await fetch("/api/bootstrap", { method: "POST", credentials: "same-origin" }).catch((e) =>
+          logger.warn("bootstrap failed", { userId: json.data.user.id }, e)
+        );
         localStorage.setItem(bootKey, "1");
       }
-    } catch {
-      // offline — keep stale state if we have it
+    } catch (e) {
+      logger.warn("auth refresh failed", undefined, e);
     } finally {
       setReady(true);
     }
