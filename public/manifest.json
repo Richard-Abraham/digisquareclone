@@ -1,0 +1,13 @@
+{
+  "name": "Digisystem",
+  "short_name": "Digisystem",
+  "description": "The project management workspace built for modern teams.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

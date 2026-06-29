@@ -3,11 +3,11 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { captureException } from "@/lib/monitoring";
 
-export default function ErrorBoundary({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function LoginError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => { captureException(error, { digest: error.digest }); }, [error]);
 
   return (
-    <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+    <div className="min-h-dvh flex flex-col items-center justify-center bg-surface px-6 text-center">
       <div className="size-14 rounded-2xl bg-red-50 dark:bg-red-500/10 flex items-center justify-center text-red-500 mb-4">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10" />
@@ -16,7 +16,7 @@ export default function ErrorBoundary({ error, reset }: { error: Error & { diges
         </svg>
       </div>
       <h2 className="text-lg font-bold text-text-primary mb-1">Something went wrong</h2>
-      <p className="text-sm text-text-secondary max-w-sm mb-6">{error.message || "An unexpected error occurred. Please try again."}</p>
+      <p className="text-sm text-text-secondary max-w-sm mb-6">{error.message || "An unexpected error occurred."}</p>
       <Button variant="primary" size="sm" onClick={reset}>Try again</Button>
     </div>
   );

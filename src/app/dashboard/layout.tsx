@@ -4,7 +4,9 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/providers";
 import { useUnreadCount } from "@/lib/hooks";
+import { useKeyboardShortcuts } from "@/lib/keyboard";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { HelpModal } from "@/components/ui/HelpModal";
 import { SpinnerIcon } from "@/components/icons";
 import { logger } from "@/lib/logger";
 import {
@@ -19,8 +21,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [unread, setUnread] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+
+  useKeyboardShortcuts([
+    { key: "?", handler: () => setHelpOpen(true) },
+    { key: "n", handler: () => router.push("/dashboard") },
+    { key: "p", handler: () => router.push("/dashboard/projects") },
+    { key: "m", handler: () => router.push("/dashboard/members") },
+    { key: "a", handler: () => router.push("/dashboard/analytics") },
+    { key: "s", handler: () => router.push("/dashboard/standup") },
+  ], [router]);
 
   // Auth guard
   useEffect(() => {
@@ -174,6 +186,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </main>
       </div>
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }
