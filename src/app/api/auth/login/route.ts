@@ -16,7 +16,10 @@ export async function POST(req: NextRequest) {
     if (!email || !password) return err("Email and password required");
 
     const { data, error: ae } = await getAdmin().auth.signInWithPassword({ email, password });
-    if (ae || !data?.user) return err("Invalid credentials", 401);
+    if (ae || !data?.user) {
+      console.error("[login] Supabase signInWithPassword error:", ae?.message, ae?.code);
+      return err("Invalid credentials", 401);
+    }
 
     let { data: profile } = await getAdmin().from("profiles").select("*").eq("user_id", data.user.id).maybeSingle();
     if (!profile) {

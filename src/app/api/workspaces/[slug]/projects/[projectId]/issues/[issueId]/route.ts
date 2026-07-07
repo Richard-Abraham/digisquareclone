@@ -71,12 +71,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
     }
   }
 
-  await writeActivity({
-    workspaceId: (before as any).workspace_id, actorId: user.id,
-    kind: isCompletedGroup(toGroup) && toGroup !== fromGroup ? "completed" : body.state_id ? "moved" : "changed",
-    targetType: "issue", issueId: params.issueId, projectId: params.projectId,
-    metadata: body.state_id ? { from: fromGroup, to: toGroup } : undefined,
-  });
+  // Only log activity for meaningful state changes. Editing title/priority/etc.
+  // should not inflate the "Moved" count.
+  if (body.state_id && toGroup !== fromGroup) {
+    await writeActivity({
+      workspaceId: (before as any).workspace_id, actorId: user.id,
+      kind: isCompletedGroup(toGroup) ? "completed" : "moved",
+      targetType: "issue", issueId: params.issueId, projectId: params.projectId,
+      metadata: { from: fromGroup, to: toGroup },
+    });
+  }
 
   return ok(data);
 }

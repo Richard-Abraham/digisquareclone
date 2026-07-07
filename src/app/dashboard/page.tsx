@@ -54,6 +54,7 @@ export default function IssuesPage() {
   const [creatingIssue, setCreatingIssue] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showInsights, setShowInsights] = useState(false);
   const [columns, setColumns] = useState<Record<Group, Issue[]>>(emptyColumns());
   const router = useRouter();
 
@@ -305,29 +306,73 @@ export default function IssuesPage() {
   );
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="section-header">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="section-title">Tasks</h1>
-            <p className="section-desc">{total} total tasks</p>
+    <div className="flex flex-col h-full">
+      {/* Header bar */}
+      <div className="flex-shrink-0 border-b border-border-subtle bg-surface-1/70 backdrop-blur-sm px-4 sm:px-6 py-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-bold text-text-primary font-display tracking-tight">Board</h1>
+                <span className="text-text-placeholder">/</span>
+                {projects.length > 0 && (
+                  <select value={projId} onChange={e => selectProject(e.target.value)}
+                    className="select text-xs !w-auto !py-1 !px-2.5 !pr-7 font-semibold !bg-surface-2 !border-transparent hover:!border-border rounded-md cursor-pointer">
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                )}
+              </div>
+              <p className="text-[11px] text-text-tertiary mt-0.5">
+                {total} task{total === 1 ? "" : "s"} · {statsByState.started || 0} in progress · {statsByState.completed || 0} done
+              </p>
+            </div>
           </div>
-          {projects.length > 0 && (
-            <select value={projId} onChange={e => selectProject(e.target.value)} className="select text-xs sm:ml-2 -mt-1">
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          )}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={() => setShowInsights(v => !v)}
+              className={`btn-sm ${showInsights ? "btn-primary" : "btn-secondary"}`}>
+              <ChartIcon />
+              <span className="hidden sm:inline">Insights</span>
+            </button>
+            <Button variant="secondary" size="sm" onClick={() => setShowProj(true)}>New Project</Button>
+            <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+              New Task
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2 flex-shrink-0">
-          <Button variant="secondary" size="sm" onClick={() => setShowProj(true)}>New Project</Button>
-          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>New Task</Button>
+
+        {/* Filter toolbar */}
+        <div className="flex items-center gap-2 mt-3 flex-wrap">
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" />
+            </svg>
+            <input value={filterSearch} onChange={e => setFilterSearch(e.target.value)} placeholder="Search tasks..."
+              className="input-sm !pl-8 w-[220px]" />
+          </div>
+          <div className="h-5 w-px bg-border hidden sm:block" />
+          <select value={filterState} onChange={e => setFilterState(e.target.value)} className="select text-xs !w-auto min-w-[110px] !py-1.5">
+            <option value="">All states</option>
+            {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="select text-xs !w-auto min-w-[110px] !py-1.5">
+            <option value="">All priorities</option>
+            {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_META[p].label}</option>)}
+          </select>
+          <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="select text-xs !w-auto min-w-[130px] !py-1.5">
+            <option value="">All members</option>
+            {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profile?.display_name || "User"}</option>)}
+          </select>
+          {(filterState || filterPriority || filterAssignee || filterSearch) && (
+            <button onClick={() => { setFilterState(""); setFilterPriority(""); setFilterAssignee(""); setFilterSearch(""); }}
+              className="btn-ghost btn-sm text-xs">Clear</button>
+          )}
         </div>
       </div>
 
-      {/* Stats + Mini Charts */}
-      {issues.length > 0 && (
-        <div className="mb-6 animate-fade-in space-y-5">
+      {/* Insights (collapsible) */}
+      {showInsights && issues.length > 0 && (
+        <div className="flex-shrink-0 px-4 sm:px-6 py-4 border-b border-border-subtle bg-surface animate-fade-in space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard label="Total Tasks" value={total} icon={<TasksIcon />} />
             <StatCard label="Team Members" value={members.length} icon={<UserIcon />} />
@@ -349,24 +394,6 @@ export default function IssuesPage() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex gap-2 mb-5 flex-wrap">
-        <select value={filterState} onChange={e => setFilterState(e.target.value)} className="select text-xs w-auto min-w-[120px]">
-          <option value="">All states</option>
-          {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-        <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="select text-xs w-auto min-w-[120px]">
-          <option value="">All priorities</option>
-          {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_META[p].label}</option>)}
-        </select>
-        <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="select text-xs w-auto min-w-[140px]">
-          <option value="">All members</option>
-          {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profile?.display_name || "User"}</option>)}
-        </select>
-        <input value={filterSearch} onChange={e => setFilterSearch(e.target.value)} placeholder="Search tasks..."
-          className="input-sm w-auto min-w-[200px]" />
-      </div>
-
       {/* Kanban board */}
       <DndContext
         sensors={sensors}
@@ -376,22 +403,24 @@ export default function IssuesPage() {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-proximity lg:grid lg:grid-cols-5">
-          {GROUPS.map((group) => {
-            const stateInfo = states.find(s => s.group_name === group);
-            const droppable = !!stateInfo;
-            return (
-              <KanbanColumn
-                key={group}
-                group={group}
-                items={columns[group]}
-                stateInfo={stateInfo}
-                droppable={droppable}
-                activeId={activeId}
-                onOpen={setSelectedIssue}
-              />
-            );
-          })}
+        <div className="flex-1 min-h-[420px] overflow-x-auto overflow-y-hidden px-4 sm:px-6 py-4">
+          <div className="flex gap-3 h-full snap-x snap-proximity items-start">
+            {GROUPS.map((group) => {
+              const stateInfo = states.find(s => s.group_name === group);
+              const droppable = !!stateInfo;
+              return (
+                <KanbanColumn
+                  key={group}
+                  group={group}
+                  items={columns[group]}
+                  stateInfo={stateInfo}
+                  droppable={droppable}
+                  activeId={activeId}
+                  onOpen={setSelectedIssue}
+                />
+              );
+            })}
+          </div>
         </div>
         <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.18,0.67,0.6,1.22)" }}>
           {activeIssue ? <DragPreviewCard issue={activeIssue} stateColor={activeStateColor} /> : null}
@@ -400,7 +429,7 @@ export default function IssuesPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 mt-8">
+        <div className="flex-shrink-0 flex items-center justify-center gap-3 py-3 border-t border-border-subtle">
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
             className="btn-secondary btn-sm">Previous</button>
           <div className="flex items-center gap-2">

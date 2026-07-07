@@ -31,9 +31,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     await getAdmin().from("standup_report_tasks").insert(items.map((c, i) => ({ standup_id: standup.id, issue_id: c.issue_id, completed: c.completed, order_index: i })));
 
     // Batch-sync completed issues to the board (was N+1).
-    const completedIds = items.filter((c) => c.completed).map((c) => c.issue_id);
-    if (completedIds.length) {
-      const { data: issues } = await getAdmin().from("issues").select("id, project_id").in("id", completedIds);
+    // Only touch issues not already completed, so repeated saves don't
+    // re-update them or write duplicate "completed" activity events.
+    const checkedIds = items.filter((c) => c.completed).map((c) => c.issue_id);
+    if (checkedIds.length) {
+      const { data: allIssues } = await getAdmin().from("issues").select("id, project_id, completed_at").in("id", checkedIds);
+      const issues = (allIssues || []).filter((i: any) => !i.completed_at);
+      const completedIds = issues.map((i: any) => i.id);
+      if (!completedIds.length) return ok({ ok: true, submitted: !!submit });
       const projectIds = Array.from(new Set((issues || []).map((i: any) => i.project_id)));
       const stateMap = new Map<string, string | null>();
       for (const pid of projectIds) stateMap.set(pid, await getCompletedState(pid));
