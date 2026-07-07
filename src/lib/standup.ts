@@ -8,6 +8,11 @@ export interface StandupTaskRef {
   completed?: boolean;
 }
 
+export interface StandupReport {
+  text: string;
+  created_at: string;
+}
+
 export interface StandupData {
   id: string;
   date: string;
@@ -18,6 +23,39 @@ export interface StandupData {
   report_tasks: StandupTaskRef[];
   created_at: string;
   updated_at: string;
+}
+
+export function parseReports(reportField: string | null | undefined): StandupReport[] {
+  if (!reportField) return [];
+  const trimmed = reportField.trim();
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed.reports)) return parsed.reports as StandupReport[];
+    } catch {}
+  }
+  // Backward compatibility: legacy plain-text reports.
+  return trimmed ? [{ text: trimmed, created_at: "" }] : [];
+}
+
+export function serializeReports(reports: StandupReport[]): string {
+  return JSON.stringify({ reports });
+}
+
+export function reportsToDisplay(reportField: string | null | undefined, submittedAt?: string | null): string {
+  const reports = parseReports(reportField);
+  if (!reports.length) return "";
+  if (reports.length === 1 && !reports[0].created_at && submittedAt) {
+    return reports[0].text;
+  }
+  return reports
+    .map((r) => {
+      const time = r.created_at
+        ? new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : "";
+      return time ? `[${time}]\n${r.text}` : r.text;
+    })
+    .join("\n\n---\n\n");
 }
 
 interface IssueLite { id: string; name: string; sequence_id: number | null; project: { name: string } | null }
