@@ -5,6 +5,9 @@ import { getAdmin } from "@/lib/supabase";
 import { getWorkspaceAccess, getCompletedState } from "@/lib/access";
 import { writeActivity } from "@/lib/activity";
 import { todayKey } from "@/lib/tasks";
+import { parseReports, serializeReports } from "@/lib/standup";
+
+const errLocked = () => err("This standup day has ended and cannot be edited", 409);
 
 interface Completion { issue_id: string; completed: boolean }
 
@@ -13,16 +16,21 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (!user) return err("Unauthorized", 401);
   const access = await getWorkspaceAccess(params.slug, user.id);
   if (!access) return err("Access denied", 403);
-  const { report, completions, submit } = await req.json() as { report?: string; completions?: Completion[]; submit?: boolean };
-  const date = todayKey();
+  const { report, completions, submit, date } = await req.json() as { report?: string; completions?: Completion[]; submit?: boolean; date?: string };
+  const dateKey = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayKey();
+  if (dateKey < todayKey()) return errLocked();
   const wsId = access.workspace.id;
   const items = completions || [];
 
-  const { data: existing } = await getAdmin().from("daily_standups").select("id, submitted_at").eq("workspace_id", wsId).eq("user_id", user.id).eq("date", date).maybeSingle();
-  if (existing?.submitted_at) return err("Report already submitted and cannot be edited", 409);
+  const { data: existing } = await getAdmin().from("daily_standups").select("id, submitted_at, report").eq("workspace_id", wsId).eq("user_id", user.id).eq("date", dateKey).maybeSingle();
 
+  const submitted_at = submit ? new Date().toISOString() : (existing?.submitted_at ?? null);
+  const reports = parseReports(existing?.report);
+  if (report?.trim()) {
+    reports.push({ text: report.trim(), created_at: new Date().toISOString() });
+  }
   const { data: standup, error: e } = await getAdmin().from("daily_standups")
-    .upsert({ workspace_id: wsId, user_id: user.id, date, report: report ?? null, submitted_at: submit ? new Date().toISOString() : null, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,user_id,date" })
+    .upsert({ workspace_id: wsId, user_id: user.id, date: dateKey, report: serializeReports(reports), submitted_at, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,user_id,date" })
     .select().single();
   if (e) return err(e.message, 400);
 
