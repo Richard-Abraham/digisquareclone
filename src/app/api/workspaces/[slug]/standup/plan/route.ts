@@ -16,6 +16,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const date = todayKey();
   const wsId = access.workspace.id;
 
+  const { data: existing } = await getAdmin().from("daily_standups").select("id, submitted_at").eq("workspace_id", wsId).eq("user_id", user.id).eq("date", date).maybeSingle();
+  if (existing?.submitted_at) return err("Standup already submitted and cannot be edited", 409);
+
   const { data: standup, error: e } = await getAdmin().from("daily_standups")
     .upsert({ workspace_id: wsId, user_id: user.id, date, plan: plan ?? null, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,user_id,date" })
     .select().single();

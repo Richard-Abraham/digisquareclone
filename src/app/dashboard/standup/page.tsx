@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useWorkspace } from "@/lib/hooks";
 import { CheckIcon, SpinnerIcon } from "@/components/icons";
@@ -25,6 +26,27 @@ const activityItems = [
 
 const TABS = [{ key: "today", label: "Today" }, { key: "history", label: "History" }];
 
+interface PlanItem { text: string; done: boolean }
+
+// Plan items are persisted in the standup `plan` text field as "[ ] item" / "[x] item" lines.
+function parsePlanItems(plan: string | null | undefined): PlanItem[] {
+  if (!plan) return [];
+  return plan.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+    const m = line.match(/^\[(x| )\]\s?(.*)$/);
+    if (m) return { done: m[1] === "x", text: m[2] };
+    return { done: false, text: line };
+  }).filter((i) => i.text.length > 0);
+}
+
+function serializePlanItems(items: PlanItem[]): string {
+  return items.map((i) => `[${i.done ? "x" : " "}] ${i.text}`).join("\n");
+}
+
+/** Render a stored plan string as readable text (for team/history views). */
+function planToDisplay(plan: string): string {
+  return plan.replace(/^\[x\]\s?/gm, "\u2713 ").replace(/^\[ \]\s?/gm, "\u2022 ");
+}
+
 export default function StandupPage() {
   const { data: ws } = useWorkspace();
   const [tab, setTab] = useState<"today" | "history">("today");
@@ -33,7 +55,8 @@ export default function StandupPage() {
   const [isManager, setIsManager] = useState(false);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [suggested, setSuggested] = useState<TaskRef[]>([]);
-  const [plan, setPlan] = useState("");
+  const [planItems, setPlanItems] = useState<PlanItem[]>([]);
+  const [planInput, setPlanInput] = useState("");
   const [planIds, setPlanIds] = useState<string[]>([]);
   const [report, setReport] = useState("");
   const [reportDone, setReportDone] = useState<Record<string, boolean>>({});
@@ -43,9 +66,11 @@ export default function StandupPage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [historyUserId, setHistoryUserId] = useState("");
+  const [loadingToday, setLoadingToday] = useState(true);
 
-  const loadToday = useCallback(async () => {
+  const loadToday = useCallback(async (opts?: { silent?: boolean }) => {
     if (!ws?.slug) return;
     try {
       const [data, act, sug] = await Promise.all([
@@ -55,40 +80,95 @@ export default function StandupPage() {
       ]);
       setMine(data.my_standup); setTeam(data.team_standups); setIsManager(data.is_manager);
       setActivity(act); setSuggested(sug);
-      setPlan(data.my_standup?.plan ?? "");
+      setPlanItems(parsePlanItems(data.my_standup?.plan));
+      setPlanInput("");
       setPlanIds(data.my_standup?.plan_tasks.map((t) => t.issue_id) ?? []);
       setReport(data.my_standup?.report ?? "");
       const dm: Record<string, boolean> = {};
       (data.my_standup?.report_tasks ?? []).forEach((t) => { dm[t.issue_id] = !!t.completed; });
       setReportDone(dm);
-    } catch {}
+    } catch (e) {
+      if (!opts?.silent) toast.error(e instanceof Error ? e.message : "Failed to load standup");
+    } finally {
+      setLoadingToday(false);
+    }
   }, [ws?.slug]);
 
   useEffect(() => { loadToday(); }, [loadToday]);
 
   const loadTeamForDate = useCallback(async (date: string) => {
     if (!ws?.slug) return;
-    const data = await api<{ team_standups: TeamRow[] }>(`/api/workspaces/${ws.slug}/standup?date=${date}`);
-    setTeam(data.team_standups);
+    try {
+      const data = await api<{ team_standups: TeamRow[] }>(`/api/workspaces/${ws.slug}/standup?date=${date}`);
+      setTeam(data.team_standups);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to load team standups");
+    }
   }, [ws?.slug]);
 
   useEffect(() => { if (isManager && teamDate !== todayKey()) loadTeamForDate(teamDate); }, [teamDate, isManager, loadTeamForDate]);
 
+  function addPlanItem() {
+    const text = planInput.trim();
+    if (!text) return;
+    setPlanItems((items) => [...items, { text, done: false }]);
+    setPlanInput("");
+  }
+
+  function removePlanItem(index: number) {
+    setPlanItems((items) => items.filter((_, i) => i !== index));
+  }
+
   async function savePlan() {
     if (!ws?.slug) return;
+    // Include anything still typed in the field so nothing is lost.
+    const pending = planInput.trim();
+    const items = pending ? [...planItems, { text: pending, done: false }] : planItems;
+    if (items.length === 0 && planIds.length === 0) {
+      toast.warning("Add a plan item or pick at least one task first.");
+      return;
+    }
     setSavingPlan(true);
-    try { await api(`/api/workspaces/${ws.slug}/standup/plan`, { method: "POST", body: { plan, issue_ids: planIds } }); await loadToday(); }
-    finally { setSavingPlan(false); }
+    try {
+      await api(`/api/workspaces/${ws.slug}/standup/plan`, { method: "POST", body: { plan: serializePlanItems(items), issue_ids: planIds } });
+      await loadToday({ silent: true });
+      const totalCount = items.length + planIds.length;
+      toast.success(`Plan saved — ${totalCount} item${totalCount === 1 ? "" : "s"} on today's list`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save plan");
+    } finally { setSavingPlan(false); }
+  }
+
+  function togglePlanItemDone(index: number, done: boolean) {
+    setPlanItems((items) => items.map((it, i) => i === index ? { ...it, done } : it));
   }
 
   async function saveReport(submit: boolean) {
     if (!ws?.slug) return;
-    if (submit && !report.trim()) return;
+    if (submit && !report.trim()) {
+      toast.warning("Write your end-of-day report before submitting.");
+      return;
+    }
     setSavingReport(true);
     try {
       const completions = planIds.map((id) => ({ issue_id: id, completed: !!reportDone[id] }));
+      const doneCount = completions.filter((c) => c.completed).length + planItems.filter((i) => i.done).length;
+      // Persist checked-off plan items before the report (submit locks the plan).
+      const savedItems = parsePlanItems(mine?.plan);
+      if (serializePlanItems(planItems) !== serializePlanItems(savedItems)) {
+        await api(`/api/workspaces/${ws.slug}/standup/plan`, { method: "POST", body: { plan: serializePlanItems(planItems), issue_ids: planIds } });
+      }
       await api(`/api/workspaces/${ws.slug}/standup/report`, { method: "POST", body: { report, completions, submit } });
-      await loadToday();
+      await loadToday({ silent: true });
+      if (submit) {
+        toast.success(doneCount > 0
+          ? `Report submitted — ${doneCount} task${doneCount === 1 ? "" : "s"} completed`
+          : "Report submitted");
+      } else {
+        toast.success("Draft saved");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save report");
     } finally { setSavingReport(false); }
   }
 
@@ -96,20 +176,49 @@ export default function StandupPage() {
 
   async function loadHistory(reset = false) {
     if (!ws?.slug) return;
-    const c = reset ? null : cursor;
-    const params = new URLSearchParams();
-    if (c) params.set("cursor", c);
-    if (isManager && historyUserId) params.set("userId", historyUserId);
-    const qs = params.toString();
-    const res = await api<{ items: HistoryItem[]; next_cursor: string | null }>(`/api/workspaces/${ws.slug}/standup/history${qs ? `?${qs}` : ""}`);
-    setHistory((prev) => reset ? res.items : [...prev, ...res.items]);
-    setCursor(res.next_cursor); setHistoryLoaded(true);
+    setHistoryLoading(true);
+    try {
+      const c = reset ? null : cursor;
+      const params = new URLSearchParams();
+      if (c) params.set("cursor", c);
+      if (isManager && historyUserId) params.set("userId", historyUserId);
+      const qs = params.toString();
+      const res = await api<{ items: HistoryItem[]; next_cursor: string | null }>(`/api/workspaces/${ws.slug}/standup/history${qs ? `?${qs}` : ""}`);
+      setHistory((prev) => reset ? res.items : [...prev, ...res.items]);
+      setCursor(res.next_cursor); setHistoryLoaded(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to load history");
+    } finally { setHistoryLoading(false); }
   }
 
   useEffect(() => { if (tab === "history" && !historyLoaded) loadHistory(true); }, [tab]);
   useEffect(() => { if (tab === "history" && historyLoaded) loadHistory(true); }, [historyUserId]);
 
   const submitted = !!mine?.submitted_at;
+
+  // Dirty-state tracking: compare local edits against last-saved server values.
+  const savedPlanItems = useMemo(() => parsePlanItems(mine?.plan), [mine?.plan]);
+
+  const planDirty = useMemo(() => {
+    const savedIds = (mine?.plan_tasks ?? []).map((t) => t.issue_id).sort().join(",");
+    const savedTexts = savedPlanItems.map((i) => i.text).join("\n");
+    const localTexts = planItems.map((i) => i.text).join("\n");
+    return planInput.trim() !== "" || localTexts !== savedTexts || [...planIds].sort().join(",") !== savedIds;
+  }, [planInput, planItems, planIds, mine, savedPlanItems]);
+
+  const reportDirty = useMemo(() => {
+    if (submitted) return false;
+    const savedReport = mine?.report ?? "";
+    const savedDone: Record<string, boolean> = {};
+    (mine?.report_tasks ?? []).forEach((t) => { savedDone[t.issue_id] = !!t.completed; });
+    if (report !== savedReport) return true;
+    if (planIds.some((id) => !!reportDone[id] !== !!savedDone[id])) return true;
+    // Checking off free-text plan items also counts as report progress.
+    return serializePlanItems(planItems) !== serializePlanItems(savedPlanItems);
+  }, [report, reportDone, planIds, planItems, mine, submitted, savedPlanItems]);
+
+  const planSavedToday = !!mine && ((mine.plan !== null && mine.plan !== "") || mine.plan_tasks.length > 0);
+
   const planTaskRefs = (mine?.plan_tasks ?? []).concat(
     suggested.filter((s) => planIds.includes(s.issue_id) && !(mine?.plan_tasks ?? []).some((p) => p.issue_id === s.issue_id))
   ).filter((t, i, arr) => arr.findIndex((x) => x.issue_id === t.issue_id) === i && planIds.includes(t.issue_id));
@@ -126,24 +235,65 @@ export default function StandupPage() {
         <Tabs items={TABS} value={tab} onChange={(v) => setTab(v as "today" | "history")} />
       </div>
 
-      {tab === "today" && (
+      {tab === "today" && loadingToday && (
+        <Spinner label="Loading today's standup..." />
+      )}
+
+      {tab === "today" && !loadingToday && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-5">
             {/* Step 1: Plan */}
             <div className="card p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="size-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
-                <h2 className="text-sm font-bold text-text-primary">What will you work on today?</h2>
+              <div className="flex items-center justify-between mb-3 gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="size-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
+                  <h2 className="text-sm font-bold text-text-primary">What will you work on today?</h2>
+                </div>
+                {submitted ? (
+                  <span className="badge-neutral">Day closed</span>
+                ) : planDirty ? (
+                  <span className="badge-warning animate-fade-in">Unsaved changes</span>
+                ) : planSavedToday ? (
+                  <span className="badge-success animate-fade-in"><CheckIcon size={10} /> Saved</span>
+                ) : null}
               </div>
-              <textarea value={plan} onChange={(e) => setPlan(e.target.value)} rows={2}
-                placeholder="Today's focus..." aria-label="Today's plan"
-                className="input resize-none mb-3" />
+              <div className="flex gap-2 mb-3">
+                <input value={planInput} onChange={(e) => setPlanInput(e.target.value)} disabled={submitted}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPlanItem(); } }}
+                  placeholder="Type a plan item and press Enter..." aria-label="Add plan item"
+                  className="input disabled:bg-surface-muted disabled:opacity-60" />
+                <Button variant="secondary" size="sm" onClick={addPlanItem} disabled={submitted || !planInput.trim()} className="flex-shrink-0">
+                  Add
+                </Button>
+              </div>
+
+              {/* Today's plan items */}
+              {planItems.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs font-semibold text-text-secondary mb-2">Today&apos;s list</p>
+                  <div className="space-y-1">
+                    {planItems.map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-2.5 text-sm py-1.5 rounded-lg px-2 -mx-2 hover:bg-surface-muted transition-colors group">
+                        <span className={`size-1.5 rounded-full flex-shrink-0 ${item.done ? "bg-emerald-500" : "bg-primary"}`} />
+                        <span className={`flex-1 truncate ${item.done ? "line-through text-text-tertiary" : "text-text-primary font-medium"}`}>{item.text}</span>
+                        {!submitted && (
+                          <button type="button" onClick={() => removePlanItem(idx)} aria-label={`Remove ${item.text}`}
+                            className="text-text-tertiary/0 group-hover:text-text-tertiary hover:!text-red-500 transition-colors flex-shrink-0">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <p className="text-xs font-semibold text-text-secondary mb-2">Pick your tasks</p>
               <div className="space-y-1 max-h-52 overflow-auto">
                 {suggested.length === 0 && <p className="text-xs text-text-tertiary py-2">No assigned tasks to pick.</p>}
                 {suggested.map((s) => (
                   <label key={s.issue_id} className="flex items-center gap-2.5 text-sm py-1.5 cursor-pointer hover:bg-surface-muted rounded-lg px-2 -mx-2 transition-colors">
-                    <input type="checkbox" checked={planIds.includes(s.issue_id)} onChange={() => togglePlanTask(s.issue_id)}
+                    <input type="checkbox" checked={planIds.includes(s.issue_id)} onChange={() => togglePlanTask(s.issue_id)} disabled={submitted}
                       className="rounded border-border text-primary focus:ring-primary-200" />
                     <span className="text-[10px] font-mono text-text-tertiary flex-shrink-0">#{s.ref}</span>
                     <span className="flex-1 truncate text-text-primary font-medium">{s.title}</span>
@@ -151,31 +301,48 @@ export default function StandupPage() {
                   </label>
                 ))}
               </div>
-              <Button variant="secondary" size="sm" onClick={savePlan} disabled={savingPlan} className="mt-4">
-                {savingPlan ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Saving...</span> : "Save plan"}
-              </Button>
+              {!submitted && (
+                <Button variant={planDirty ? "primary" : "secondary"} size="sm" onClick={savePlan}
+                  disabled={savingPlan || (!planDirty && planSavedToday)} className="mt-4">
+                  {savingPlan
+                    ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Saving...</span>
+                    : (!planDirty && planSavedToday) ? <span className="flex items-center gap-1.5"><CheckIcon size={12} /> Plan saved</span> : "Save plan"}
+                </Button>
+              )}
             </div>
 
             {/* Step 2: End of day report */}
             <div className="card p-5">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3 gap-2">
                 <div className="flex items-center gap-2">
                   <span className="size-6 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
                   <h2 className="text-sm font-bold text-text-primary">End-of-day report</h2>
                 </div>
-                {submitted && (
+                {submitted ? (
                   <span className="badge-success animate-fade-in">
                     <CheckIcon size={10} /> Submitted {new Date(mine!.submitted_at!).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </span>
-                )}
+                ) : reportDirty ? (
+                  <span className="badge-warning animate-fade-in">Unsaved changes</span>
+                ) : (mine?.report != null && mine.report !== "") ? (
+                  <span className="badge-neutral animate-fade-in">Draft saved</span>
+                ) : null}
               </div>
               <textarea value={report} onChange={(e) => setReport(e.target.value)} disabled={submitted} rows={3}
                 placeholder="Blockers, wins, notes..." aria-label="End of day report"
                 className="input resize-none disabled:bg-surface-muted disabled:opacity-60 mb-3" />
-              {planTaskRefs.length > 0 && (
-                <p className="text-xs font-semibold text-text-secondary mb-2">Mark completed <span className="text-text-tertiary font-normal">(checked tasks move to Done on the board)</span></p>
+              {(planTaskRefs.length > 0 || planItems.length > 0) && (
+                <p className="text-xs font-semibold text-text-secondary mb-2">Mark completed <span className="text-text-tertiary font-normal">(checked board tasks move to Done)</span></p>
               )}
               <div className="space-y-1">
+                {planItems.map((item, idx) => (
+                  <label key={`plan-${idx}`} className="flex items-center gap-2.5 text-sm py-1.5 cursor-pointer hover:bg-surface-muted rounded-lg px-2 -mx-2 transition-colors">
+                    <input type="checkbox" disabled={submitted} checked={item.done}
+                      onChange={(e) => togglePlanItemDone(idx, e.target.checked)}
+                      className="rounded border-border text-primary focus:ring-primary-200" />
+                    <span className={`flex-1 truncate ${item.done ? "line-through text-text-tertiary" : "text-text-primary font-medium"}`}>{item.text}</span>
+                  </label>
+                ))}
                 {planTaskRefs.map((t) => (
                   <label key={t.issue_id} className="flex items-center gap-2.5 text-sm py-1.5 cursor-pointer hover:bg-surface-muted rounded-lg px-2 -mx-2 transition-colors">
                     <input type="checkbox" disabled={submitted} checked={!!reportDone[t.issue_id]}
@@ -187,14 +354,18 @@ export default function StandupPage() {
                 ))}
               </div>
               {!submitted && (
-                <div className="flex flex-wrap gap-2 mt-4">
-                  <Button variant="secondary" size="sm" onClick={() => saveReport(false)} disabled={savingReport}>
+                <div className="flex flex-wrap items-center gap-2 mt-4">
+                  <Button variant="secondary" size="sm" onClick={() => saveReport(false)} disabled={savingReport || !reportDirty}>
                     {savingReport ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Saving...</span> : "Save draft"}
                   </Button>
                   <Button variant="primary" size="sm" onClick={() => saveReport(true)} disabled={savingReport || !report.trim()}>
                     {savingReport ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Submitting...</span> : "Submit report"}
                   </Button>
+                  <p className="text-[11px] text-text-tertiary">Submitting locks today’s standup and moves checked tasks to Done.</p>
                 </div>
+              )}
+              {submitted && (
+                <p className="text-[11px] text-text-tertiary mt-3">Today’s standup is locked. See you tomorrow!</p>
               )}
             </div>
           </div>
@@ -235,7 +406,7 @@ export default function StandupPage() {
                       <p className="text-sm font-semibold text-text-primary truncate">{row.profile?.display_name || row.user_id.slice(0, 8)}</p>
                       {row.standup ? (
                         <>
-                          {row.standup.plan && <p className="text-xs text-text-secondary mt-1 line-clamp-2"><span className="text-text-tertiary">Plan:</span> {row.standup.plan}</p>}
+                          {row.standup.plan && <p className="text-xs text-text-secondary mt-1 line-clamp-2 whitespace-pre-line"><span className="text-text-tertiary">Plan:</span> {planToDisplay(row.standup.plan)}</p>}
                           {row.standup.report && <p className="text-xs text-text-secondary mt-1 line-clamp-2"><span className="text-text-tertiary">Report:</span> {row.standup.report}</p>}
                           <span className={`inline-block mt-1.5 badge ${row.standup.submitted_at ? "badge-success" : "badge-warning"}`}>
                             {row.standup.submitted_at ? "Submitted" : "In progress"}
@@ -277,7 +448,7 @@ export default function StandupPage() {
                 </span>
                 <span className="text-[10px] text-text-tertiary font-medium">{new Date(h.date).toLocaleDateString()}</span>
               </div>
-              {h.plan && <p className="text-sm text-text-secondary mt-1"><span className="text-text-tertiary font-medium">Plan:</span> {h.plan}</p>}
+              {h.plan && <p className="text-sm text-text-secondary mt-1 whitespace-pre-line"><span className="text-text-tertiary font-medium">Plan:</span> {planToDisplay(h.plan)}</p>}
               {h.report && <p className="text-sm text-text-secondary mt-1"><span className="text-text-tertiary font-medium">Report:</span> {h.report}</p>}
               {h.report_tasks.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-3">
@@ -292,7 +463,9 @@ export default function StandupPage() {
             </div>
           ))}
           {cursor && (
-            <button onClick={() => loadHistory()} className="btn-secondary btn-md w-full">Load more</button>
+            <button onClick={() => loadHistory()} disabled={historyLoading} className="btn-secondary btn-md w-full">
+              {historyLoading ? <span className="flex items-center justify-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Loading...</span> : "Load more"}
+            </button>
           )}
         </div>
       )}
