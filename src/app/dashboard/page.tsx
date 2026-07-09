@@ -14,6 +14,7 @@ import { StatCard, ChartCard, DonutChart, BarChart, chartColors } from "@/compon
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Drawer } from "@/components/ui/Drawer";
+import { CreateTaskDrawer } from "@/components/issue/CreateTaskDrawer";
 import IssuePanel from "./issue-panel";
 import {
   KanbanColumn, DragPreviewCard, GROUPS, PRIORITIES, PRIO_META,
@@ -41,17 +42,12 @@ export default function IssuesPage() {
   const [filterAssignee, setFilterAssignee] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newPriority, setNewPriority] = useState("none");
-  const [newAssigneeIds, setNewAssigneeIds] = useState<string[]>([]);
-  const [newBug, setNewBug] = useState(false);
   const [wsSlug, setWsSlug] = useState("");
   const [projId, setProjId] = useState("");
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [showProj, setShowProj] = useState(false);
   const [newProjName, setNewProjName] = useState("");
   const [creatingProj, setCreatingProj] = useState(false);
-  const [creatingIssue, setCreatingIssue] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showInsights, setShowInsights] = useState(false);
@@ -126,22 +122,6 @@ export default function IssuesPage() {
     return g;
   }, [issues]);
   useEffect(() => { setColumns(derivedColumns); }, [derivedColumns]);
-
-  async function createIssue() {
-    if (!newName.trim()) return;
-    setCreatingIssue(true);
-    try {
-      const issue = await api<Issue>(`/api/workspaces/${wsSlug}/projects/${projId}/issues`, {
-        method: "POST", body: { name: newName, priority: newPriority, assignee_ids: newAssigneeIds, is_bug: newBug },
-      });
-      setNewName(""); setNewBug(false); setNewAssigneeIds([]); setShowCreate(false);
-      setPage(1); setIssues(prev => [issue, ...prev]); setTotal(t => t + 1);
-    } catch {} finally { setCreatingIssue(false); }
-  }
-
-  function toggleNewAssignee(uid: string) {
-    setNewAssigneeIds((cur) => cur.includes(uid) ? cur.filter((x) => x !== uid) : [...cur, uid]);
-  }
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -467,51 +447,19 @@ export default function IssuesPage() {
         </div>
       </Drawer>
 
-      {/* Create issue drawer */}
-      <Drawer open={showCreate} onClose={() => setShowCreate(false)} title="Create Task" description="Add a new task to the current project." initialWidth={560} maxWidth={720}
-        footer={<>
-          <Button variant="secondary" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
-          <Button variant="primary" size="sm" onClick={createIssue} disabled={creatingIssue || !newName.trim()}>
-            {creatingIssue ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Creating...</span> : "Create task"}
-          </Button>
-        </>}>
-        <div className="space-y-5">
-          <Input label="Task name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Fix login redirect"
-            autoFocus onKeyDown={e => e.key === "Enter" && createIssue()} />
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Priority</label>
-              <select value={newPriority} onChange={e => setNewPriority(e.target.value)} className="select">
-                {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_META[p].label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Type</label>
-              <label className="flex items-center gap-2.5 h-[40px] text-sm text-text-secondary cursor-pointer">
-                <input type="checkbox" checked={newBug} onChange={e => setNewBug(e.target.checked)}
-                  className="size-4 rounded border-border text-primary focus:ring-primary-200" />
-                Mark as bug
-              </label>
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Assignees</label>
-            <div className="flex flex-wrap gap-2">
-              {members.length === 0 && <p className="text-xs text-text-tertiary font-light">No members yet.</p>}
-              {members.map(m => {
-                const on = newAssigneeIds.includes(m.user_id);
-                return (
-                  <button key={m.user_id} type="button" onClick={() => toggleNewAssignee(m.user_id)}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition-all duration-150
-                      ${on ? "bg-primary-50 border-primary-300 text-primary font-medium dark:bg-primary-500/15 dark:border-primary-500/40" : "border-border text-text-secondary hover:bg-surface-2 hover:border-border-accent"}`}>
-                    {m.profile?.display_name || m.user_id.slice(0, 6)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </Drawer>
+      {/* Create task drawer */}
+      <CreateTaskDrawer
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        wsSlug={wsSlug}
+        projId={projId}
+        members={members}
+        onCreated={() => {
+          setShowCreate(false);
+          setPage(1);
+          loadIssues(undefined, undefined, 1);
+        }}
+      />
 
       {/* Slide-over panel */}
       {selectedIssue && (

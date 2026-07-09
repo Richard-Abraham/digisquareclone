@@ -84,7 +84,7 @@ export function tallyActivity(kinds: string[]): ActivitySummary {
     else if (kind === "created") c.created++;
     else if (kind === "commented" || kind === "mentioned") c.commented++;
     else if (kind === "approved" || kind === "changes_requested") c.reviewed++;
-    else if (kind === "moved") c.moved++;
+    else if (kind === "moved" || kind === "changed") c.moved++;
     else if (kind === "bugged") c.bugs++;
   }
   return c;

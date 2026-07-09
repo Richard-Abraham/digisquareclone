@@ -1,6 +1,16 @@
 -- Performance + integrity: add missing indexes, foreign keys, and CHECK constraints
 -- identified in the database efficiency audit.
 
+-- Per-project issue sequence numbers (used by create_issue_atomic for race-safe IDs).
+create table if not exists issue_sequences (
+  id         uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  issue_id   uuid references issues(id) on delete cascade,
+  sequence   bigint not null,
+  created_at timestamptz not null default now()
+);
+comment on table issue_sequences is 'Reserves per-project issue sequence numbers atomically.';
+
 -- ─── Indexes for hot query paths ───
 create index if not exists issues_project_state_idx
   on issues (project_id, state_id, sort_order, sequence_id desc)
