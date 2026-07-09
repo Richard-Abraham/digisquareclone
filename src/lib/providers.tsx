@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { Toaster } from "sonner";
 import { getToken } from "./api";
 
 interface User { id: string; email: string; }
@@ -87,6 +88,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AuthContext.Provider value={{ user, profile, ready, refresh }}>
         {children}
+        <Toaster position="bottom-right" richColors closeButton />
       </AuthContext.Provider>
     </QueryClientProvider>
   );

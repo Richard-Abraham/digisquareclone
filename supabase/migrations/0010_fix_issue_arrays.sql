@@ -1,5 +1,8 @@
--- Atomic issue creation in a single transaction.
--- Eliminates the sequence_id race (R2) and the multi-step partial-failure risk (R1).
+-- Fix create_issue_atomic RPC to handle empty / null relation arrays reliably.
+-- Some Supabase clients cannot infer the element type of an empty uuid[] literal
+-- (`{}`), which causes a "could not determine data type of parameter" 400 error
+-- when no assignees/reviewers/tags are provided. Using text[] parameters and
+-- casting inside the function removes that ambiguity.
 
 create or replace function create_issue_atomic(
   p_project_id uuid,
@@ -14,9 +17,9 @@ create or replace function create_issue_atomic(
   p_start_date date,
   p_target_date date,
   p_parent_id uuid,
-  p_assignee_ids uuid[],
-  p_reviewer_ids uuid[],
-  p_tag_ids uuid[]
+  p_assignee_ids text[],
+  p_reviewer_ids text[],
+  p_tag_ids text[]
 )
 returns jsonb
 language plpgsql
@@ -26,7 +29,15 @@ declare
   v_issue_id uuid;
   v_issue jsonb;
   v_default_state_id uuid;
+  v_assignee_ids uuid[];
+  v_reviewer_ids uuid[];
+  v_tag_ids uuid[];
 begin
+  -- Cast relation id arrays once, tolerating NULL or empty input.
+  v_assignee_ids := coalesce(p_assignee_ids, array[]::text[])::uuid[];
+  v_reviewer_ids := coalesce(p_reviewer_ids, array[]::text[])::uuid[];
+  v_tag_ids      := coalesce(p_tag_ids,      array[]::text[])::uuid[];
+
   -- Pick default state if none supplied.
   if p_state_id is null then
     select id into v_default_state_id
@@ -67,21 +78,21 @@ begin
   update issue_sequences set issue_id = v_issue_id where project_id = p_project_id and sequence = v_next_seq;
 
   -- Insert related records.
-  if array_length(p_assignee_ids, 1) > 0 then
+  if array_length(v_assignee_ids, 1) > 0 then
     insert into issue_assignees (issue_id, user_id)
-    select v_issue_id, unnest(p_assignee_ids)
+    select v_issue_id, unnest(v_assignee_ids)
     on conflict do nothing;
   end if;
 
-  if array_length(p_reviewer_ids, 1) > 0 then
+  if array_length(v_reviewer_ids, 1) > 0 then
     insert into issue_reviewers (issue_id, user_id, state)
-    select v_issue_id, unnest(p_reviewer_ids), 'pending'
+    select v_issue_id, unnest(v_reviewer_ids), 'pending'
     on conflict do nothing;
   end if;
 
-  if array_length(p_tag_ids, 1) > 0 then
+  if array_length(v_tag_ids, 1) > 0 then
     insert into issue_tags (issue_id, tag_id)
-    select v_issue_id, unnest(p_tag_ids)
+    select v_issue_id, unnest(v_tag_ids)
     on conflict do nothing;
   end if;
 
