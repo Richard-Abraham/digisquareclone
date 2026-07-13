@@ -11,6 +11,10 @@ export interface StandupTaskRef {
 export interface StandupReport {
   text: string;
   created_at: string;
+  /** Indexes (0-based) into the plan's free-text items this report addresses. */
+  plan_indexes?: number[];
+  /** Board issue ids this report addresses. */
+  issue_ids?: string[];
 }
 
 export interface StandupData {
@@ -23,6 +27,102 @@ export interface StandupData {
   report_tasks: StandupTaskRef[];
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * A single plan+report pair. Each entry is fully self-contained so admins can
+ * see exactly which report belongs to which plan.
+ */
+export interface StandupEntry {
+  id: string;
+  plan: string;
+  report: string;
+  /** If the plan was created from a board task, its issue id. */
+  issue_id: string | null;
+  /** ISO timestamp when the user finalized (submitted) this entry. */
+  submitted_at: string | null;
+}
+
+/**
+ * Parse standup entries stored in `daily_standups.report`.
+ *
+ * Supports three storage formats so historical data keeps rendering:
+ *   1. New format: JSON `{ entries: [...] }` — one entry per plan+report pair.
+ *   2. Legacy JSON: `{ reports: [{ text, created_at }] }` combined with the
+ *      plain-text `plan` field. Synthesized into a single entry (or one per
+ *      report if multiple exist, all sharing the same plan text).
+ *   3. Very old rows: plain-text `report` (and optional plain-text `plan`).
+ *      Rendered as a single entry.
+ */
+export function parseEntries(
+  reportField: string | null | undefined,
+  planField?: string | null,
+  submittedAt?: string | null,
+): StandupEntry[] {
+  const trimmed = (reportField ?? "").trim();
+
+  // Format 1: new entries payload.
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed.entries)) {
+        return (parsed.entries as any[]).map((e) => ({
+          id: String(e.id),
+          plan: String(e.plan ?? ""),
+          report: String(e.report ?? ""),
+          issue_id: e.issue_id ?? null,
+          submitted_at: e.submitted_at ?? null,
+        }));
+      }
+      // Format 2: legacy `reports` array.
+      if (Array.isArray(parsed.reports)) {
+        const planText = normalizeLegacyPlan(planField);
+        const reports = parsed.reports as StandupReport[];
+        if (reports.length === 0) {
+          return planText
+            ? [{ id: "legacy-0", plan: planText, report: "", issue_id: null, submitted_at: submittedAt ?? null }]
+            : [];
+        }
+        return reports.map((r, i) => ({
+          id: `legacy-${i}`,
+          plan: planText || "(no plan recorded)",
+          report: r.text || "",
+          issue_id: null,
+          submitted_at: r.created_at || submittedAt || null,
+        }));
+      }
+    } catch { /* fall through */ }
+  }
+
+  // Format 3: plain-text legacy row.
+  const planText = normalizeLegacyPlan(planField);
+  if (!trimmed && !planText) return [];
+  return [{
+    id: "legacy-0",
+    plan: planText || "(no plan recorded)",
+    report: trimmed,
+    issue_id: null,
+    submitted_at: submittedAt ?? null,
+  }];
+}
+
+/** Turn legacy `[x] item\n[ ] item` plan text into a readable bullet list. */
+function normalizeLegacyPlan(plan: string | null | undefined): string {
+  if (!plan) return "";
+  return plan
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const m = line.match(/^\[(x| )\]\s?(.*)$/);
+      if (!m) return `• ${line}`;
+      return m[1] === "x" ? `✓ ${m[2]}` : `• ${m[2]}`;
+    })
+    .join("\n");
+}
+
+export function serializeEntries(entries: StandupEntry[]): string {
+  return JSON.stringify({ entries });
 }
 
 export function parseReports(reportField: string | null | undefined): StandupReport[] {

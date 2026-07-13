@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   if (!user) return err("Unauthorized", 401);
   const access = await getWorkspaceAccess(params.slug, user.id);
   if (!access) return err("Access denied", 403);
-  const { report, completions, submit, date } = await req.json() as { report?: string; completions?: Completion[]; submit?: boolean; date?: string };
+  const { report, completions, submit, date, plan_indexes, issue_ids } = await req.json() as { report?: string; completions?: Completion[]; submit?: boolean; date?: string; plan_indexes?: number[]; issue_ids?: string[] };
   const dateKey = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayKey();
   if (dateKey < todayKey()) return errLocked();
   const wsId = access.workspace.id;
@@ -27,7 +27,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
   const submitted_at = submit ? new Date().toISOString() : (existing?.submitted_at ?? null);
   const reports = parseReports(existing?.report);
   if (report?.trim()) {
-    reports.push({ text: report.trim(), created_at: new Date().toISOString() });
+    reports.push({
+      text: report.trim(),
+      created_at: new Date().toISOString(),
+      plan_indexes: Array.isArray(plan_indexes) ? plan_indexes.filter((n) => Number.isInteger(n) && n >= 0) : [],
+      issue_ids: Array.isArray(issue_ids) ? issue_ids.filter((s) => typeof s === "string") : [],
+    });
   }
   const { data: standup, error: e } = await getAdmin().from("daily_standups")
     .upsert({ workspace_id: wsId, user_id: user.id, date: dateKey, report: serializeReports(reports), submitted_at, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,user_id,date" })
