@@ -3,7 +3,11 @@ import "./globals.css";
 import { Providers } from "@/lib/providers";
 import { ThemeProvider } from "@/lib/theme";
 
-export const metadata: Metadata = { title: "Digisystem", description: "Task management" };
+export const metadata: Metadata = {
+  title: { default: "Digisystem", template: "%s · Digisystem" },
+  description: "Task management for modern teams",
+  icons: { icon: "/icon.png" },
+};
 
 const themeScript = `(function(){try{var s=localStorage.getItem('digisystem-theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s||(d?'dark':'light');if(t==='dark')document.documentElement.classList.add('dark');}catch(e){}})();`;
 

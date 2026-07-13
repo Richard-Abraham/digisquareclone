@@ -50,7 +50,7 @@ export default function IssuesPage() {
   const [creatingProj, setCreatingProj] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [showInsights, setShowInsights] = useState(false);
+  const [showInsights, setShowInsights] = useState(true);
   const [columns, setColumns] = useState<Record<Group, Issue[]>>(emptyColumns());
   const router = useRouter();
 
@@ -160,34 +160,9 @@ export default function IssuesPage() {
   }
 
   function handleDragOver(e: DragOverEvent) {
-    const { active, over } = e;
-    if (!over) return;
-    const activeIdLocal = active.id as string;
-
-    let overGroup: Group | null = null;
-    if (GROUPS.includes(over.id as Group)) overGroup = over.id as Group;
-    else overGroup = groupOf(over.id as string);
-    const fromGroup = groupOf(activeIdLocal);
-    if (!overGroup || !fromGroup || fromGroup === overGroup) return;
-    if (!states.some((s) => s.group_name === overGroup)) return;
-
-    setColumns((prev) => {
-      const next = { ...prev };
-      const fromItems = [...prev[fromGroup!]];
-      const toItems = [...prev[overGroup!]];
-      const idx = fromItems.findIndex((i) => i.id === activeIdLocal);
-      if (idx < 0) return prev;
-      const [moved] = fromItems.splice(idx, 1);
-      let insertAt = toItems.length;
-      if (!GROUPS.includes(over.id as Group)) {
-        const oi = toItems.findIndex((i) => i.id === over.id);
-        if (oi >= 0) insertAt = oi;
-      }
-      toItems.splice(insertAt, 0, moved);
-      next[fromGroup!] = fromItems;
-      next[overGroup!] = toItems;
-      return next;
-    });
+    // Cross-column moves are handled entirely in handleDragEnd.
+    // The SortableContext items must remain stable during drag
+    // for @dnd-kit/sortable v10 to track the active item correctly.
   }
 
   async function handleDragEnd(e: DragEndEvent) {
@@ -288,16 +263,19 @@ export default function IssuesPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header bar */}
-      <div className="flex-shrink-0 border-b border-border-subtle bg-surface-1/70 backdrop-blur-sm px-4 sm:px-6 py-3">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex-shrink-0 border-b border-border-subtle bg-surface-1 px-4 sm:px-6 py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
+            <div className="hidden sm:flex size-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 shadow-sm items-center justify-center flex-shrink-0 text-white">
+              <TasksIcon />
+            </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold text-text-primary font-display tracking-tight">Board</h1>
+                <h1 className="text-lg font-bold text-text-primary font-display tracking-tight">Board</h1>
                 <span className="text-text-placeholder">/</span>
                 {projects.length > 0 && (
                   <select value={projId} onChange={e => selectProject(e.target.value)}
-                    className="select text-xs !w-auto !py-1 !px-2.5 !pr-7 font-semibold !bg-surface-2 !border-transparent hover:!border-border rounded-md cursor-pointer">
+                    className="select text-xs !w-auto !py-1 !px-2.5 !pr-7 font-semibold !bg-surface-2 !border-border hover:!border-border-accent rounded-lg cursor-pointer transition-colors">
                     {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 )}
@@ -322,30 +300,30 @@ export default function IssuesPage() {
         </div>
 
         {/* Filter toolbar */}
-        <div className="flex items-center gap-2 mt-3 flex-wrap">
+        <div className="flex items-center gap-2 mt-4 flex-wrap">
           <div className="relative">
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" />
             </svg>
             <input value={filterSearch} onChange={e => setFilterSearch(e.target.value)} placeholder="Search tasks..."
-              className="input-sm !pl-8 w-[220px]" />
+              className="input-sm !pl-8 w-[220px] rounded-lg" />
           </div>
           <div className="h-5 w-px bg-border hidden sm:block" />
-          <select value={filterState} onChange={e => setFilterState(e.target.value)} className="select text-xs !w-auto min-w-[110px] !py-1.5">
+          <select value={filterState} onChange={e => setFilterState(e.target.value)} className="select text-xs !w-auto min-w-[110px] !py-1.5 rounded-lg">
             <option value="">All states</option>
             {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="select text-xs !w-auto min-w-[110px] !py-1.5">
+          <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="select text-xs !w-auto min-w-[110px] !py-1.5 rounded-lg">
             <option value="">All priorities</option>
             {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_META[p].label}</option>)}
           </select>
-          <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="select text-xs !w-auto min-w-[130px] !py-1.5">
+          <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="select text-xs !w-auto min-w-[130px] !py-1.5 rounded-lg">
             <option value="">All members</option>
             {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profile?.display_name || "User"}</option>)}
           </select>
           {(filterState || filterPriority || filterAssignee || filterSearch) && (
             <button onClick={() => { setFilterState(""); setFilterPriority(""); setFilterAssignee(""); setFilterSearch(""); }}
-              className="btn-ghost btn-sm text-xs">Clear</button>
+              className="btn-ghost btn-sm text-xs rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors">Clear</button>
           )}
         </div>
       </div>
@@ -383,8 +361,8 @@ export default function IssuesPage() {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex-1 min-h-[420px] overflow-x-auto overflow-y-hidden px-4 sm:px-6 py-4">
-          <div className="flex gap-3 h-full snap-x snap-proximity items-start">
+        <div className="flex-1 min-h-[420px] overflow-x-auto overflow-y-hidden px-4 sm:px-6 py-5 bg-surface">
+          <div className="flex gap-4 h-full snap-x snap-proximity items-start">
             {GROUPS.map((group) => {
               const stateInfo = states.find(s => s.group_name === group);
               const droppable = !!stateInfo;

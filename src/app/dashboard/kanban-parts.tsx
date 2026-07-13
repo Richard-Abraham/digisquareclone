@@ -132,7 +132,8 @@ export function KanbanCard({ issue, stateColor, onOpen }: KanbanCardProps) {
       {...listeners}
       onClick={() => onOpen(issue.id)}
       className={clsx(
-        "card px-3 py-2.5 cursor-grab active:cursor-grabbing transition-all duration-150 hover:shadow-elevated hover:border-border-accent hover:-translate-y-px border-l-[3px] group relative",
+        "bg-surface-card rounded-xl border border-border px-3 py-2.5 cursor-grab active:cursor-grabbing transition-all duration-200",
+        "hover:shadow-card hover:border-border-accent hover:-translate-y-0.5 border-l-[3px] group relative",
         isDragging && "opacity-40 ring-2 ring-primary-300 scale-[1.02]"
       )}
     >
@@ -146,7 +147,7 @@ export function KanbanCard({ issue, stateColor, onOpen }: KanbanCardProps) {
 
 export function DragPreviewCard({ issue, stateColor }: { issue: Issue; stateColor?: string }) {
   return (
-    <div className="card px-3 py-2.5 border-l-[3px] shadow-modal rotate-2 cursor-grabbing w-[264px]" style={{ borderLeftColor: stateColor || "#E2E8F0" }}>
+    <div className="bg-surface-card rounded-xl border border-border px-3 py-2.5 border-l-[3px] shadow-modal rotate-2 cursor-grabbing w-[264px]" style={{ borderLeftColor: stateColor || "#E2E8F0" }}>
       <CardBody issue={issue} />
     </div>
   );
@@ -171,21 +172,21 @@ export function KanbanColumn({ group, items, stateInfo, droppable, activeId, onO
   return (
     <div
       className={clsx(
-        "w-[280px] min-w-[280px] snap-start flex flex-col rounded-xl transition-all duration-200 max-h-full",
-        "bg-surface-2/60 border",
+        "w-[280px] min-w-[280px] snap-start flex flex-col rounded-2xl transition-all duration-200 max-h-full shadow-sm",
+        "bg-surface-2/40 border backdrop-blur-sm",
         isOver && droppable ? "border-primary-300 ring-2 ring-primary-200/60 bg-primary-50/40 dark:bg-primary-500/5" : "border-border-subtle"
       )}
     >
       {/* Column header */}
-      <div className="flex items-center justify-between px-3.5 pt-3 pb-2.5 flex-shrink-0">
+      <div className="flex items-center justify-between px-3.5 pt-3.5 pb-2.5 flex-shrink-0 border-b border-border-subtle/80">
         <div className="flex items-center gap-2">
-          <span className="size-2.5 rounded-full ring-4" style={{
+          <span className="size-2.5 rounded-full ring-[3px]" style={{
             backgroundColor: stateInfo?.color || "#94A3B8",
-            ['--tw-ring-color' as any]: `${stateInfo?.color || "#94A3B8"}20`,
+            ['--tw-ring-color' as any]: `${stateInfo?.color || "#94A3B8"}25`,
           }} />
           <span className="text-xs font-bold text-text-primary tracking-wide">{stateInfo?.name || GROUP_LABELS[group]}</span>
         </div>
-        <span className="text-[11px] font-semibold text-text-tertiary min-w-[22px] h-[20px] px-1.5 rounded-md bg-surface-card border border-border-subtle flex items-center justify-center">
+        <span className="text-[11px] font-bold text-text-secondary min-w-[22px] h-[20px] px-1.5 rounded-lg bg-surface-card border border-border-subtle flex items-center justify-center shadow-sm">
           {items.length}
         </span>
       </div>
@@ -200,7 +201,7 @@ export function KanbanColumn({ group, items, stateInfo, droppable, activeId, onO
         {items.length === 0 && (
           <div
             className={clsx(
-              "text-xs text-center py-8 rounded-lg border-2 border-dashed transition-colors",
+              "text-xs text-center py-8 rounded-xl border-2 border-dashed transition-colors",
               isOver && droppable ? "border-primary-300 bg-primary-50/50 text-primary dark:bg-primary-500/10" : showDropHere ? "border-border-accent text-text-tertiary" : "border-border/70 text-text-tertiary"
             )}
           >
