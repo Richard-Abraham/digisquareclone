@@ -24,6 +24,7 @@ interface CreateTaskDrawerProps {
 
 interface CreateTaskInput {
   name: string;
+  description_html: string;
   priority: string;
   assignee_ids: string[];
   is_bug: boolean;
@@ -31,6 +32,7 @@ interface CreateTaskInput {
 
 export function CreateTaskDrawer({ open, onClose, wsSlug, projId, members, onCreated }: CreateTaskDrawerProps) {
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("none");
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [isBug, setIsBug] = useState(false);
@@ -42,6 +44,7 @@ export function CreateTaskDrawer({ open, onClose, wsSlug, projId, members, onCre
   useEffect(() => {
     if (open) {
       setName("");
+      setDescription("");
       setPriority("none");
       setAssigneeIds([]);
       setIsBug(false);
@@ -72,6 +75,7 @@ export function CreateTaskDrawer({ open, onClose, wsSlug, projId, members, onCre
     setSubmitting(true);
     const body: CreateTaskInput = {
       name: name.trim(),
+      description_html: description.trim(),
       priority,
       assignee_ids: assigneeIds,
       is_bug: isBug,
@@ -133,6 +137,19 @@ export function CreateTaskDrawer({ open, onClose, wsSlug, projId, members, onCre
           autoFocus
           error={nameError}
         />
+
+        <div>
+          <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+            Description
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Describe the task, acceptance criteria, or any relevant details..."
+            rows={4}
+            className="input resize-none rounded-xl"
+          />
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>

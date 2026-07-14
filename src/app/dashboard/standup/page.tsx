@@ -164,10 +164,7 @@ export default function StandupPage() {
     } finally { setHistoryLoading(false); }
   }
 
-  // Always refresh history when the tab becomes active so newly submitted
-  // entries show up immediately without a manual reload.
-  useEffect(() => { if (tab === "history") loadHistory(true); }, [tab]);
-  useEffect(() => { if (tab === "history" && historyLoaded) loadHistory(true); }, [historyUserId]);
+  useEffect(() => { if (tab === "history") loadHistory(true); }, [tab, historyUserId]);
 
   const locked = selectedDate < todayKey();
   const takenIssueIds = new Set(entries.map((e) => e.issue_id).filter(Boolean) as string[]);
