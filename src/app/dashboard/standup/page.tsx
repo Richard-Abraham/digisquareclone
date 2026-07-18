@@ -175,9 +175,14 @@ export default function StandupPage() {
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="section-header flex-wrap gap-3">
-        <div>
-          <h1 className="section-title">Daily Standup</h1>
-          <p className="section-desc">{new Date(selectedDate + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex size-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 shadow-sm items-center justify-center flex-shrink-0 text-white">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+          </div>
+          <div>
+            <h1 className="section-title">Daily Standup</h1>
+            <p className="section-desc">{new Date(selectedDate + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</p>
+          </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <input type="date" value={selectedDate} max={todayKey()} onChange={(e) => setSelectedDate(e.target.value || todayKey())}
@@ -308,13 +313,34 @@ export default function StandupPage() {
 
           {/* Activity sidebar */}
           <aside className="space-y-5">
+            {/* Progress card */}
+            <div className="card p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-bold text-text-secondary uppercase tracking-wider">Today's Progress</h2>
+                <span className={`badge text-[9px] ${entries.length > 0 && entries.every(e => e.submitted_at) ? "badge-success" : "badge-warning"}`}>
+                  {entries.length > 0 && entries.every(e => e.submitted_at) ? "All Done" : `${entries.filter(e => e.submitted_at).length}/${entries.length}`}
+                </span>
+              </div>
+              {entries.length > 0 ? (
+                <>
+                  <div className="h-2 rounded-full bg-surface-2 overflow-hidden mb-3">
+                    <div className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500 transition-all duration-500" style={{ width: `${Math.round((entries.filter(e => e.submitted_at).length / entries.length) * 100)}%` }} />
+                  </div>
+                  <p className="text-[10px] text-text-tertiary">{entries.filter(e => e.submitted_at).length} of {entries.length} entries submitted</p>
+                </>
+              ) : (
+                <p className="text-xs text-text-tertiary">No entries yet today.</p>
+              )}
+            </div>
+
+            {/* Activity stats */}
             <div className="card p-5 border-border-accent/60">
-              <h2 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-4">This week</h2>
+              <h2 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-4">This Week</h2>
               {activity ? (
                 <div className="grid grid-cols-2 gap-2">
                   {activityItems.map(({ key, label, color }) => (
-                    <div key={key} className="rounded-xl bg-surface-2/70 border border-border-subtle py-3 text-center transition-colors hover:bg-surface-2">
-                      <p className={`text-xl font-extrabold ${color}`}>{activity[key]}</p>
+                    <div key={key} className="rounded-xl bg-surface-2/70 border border-border-subtle py-3 text-center transition-colors hover:bg-surface-2 hover:border-border-accent">
+                      <p className={`text-xl font-extrabold font-display ${color}`}>{activity[key]}</p>
                       <p className="text-[10px] text-text-tertiary font-medium mt-0.5">{label}</p>
                     </div>
                   ))}
