@@ -91,7 +91,7 @@ export default function IssuesPage() {
         api<State[]>(`/api/workspaces/${slug}/projects/${pid}/states`).then(setStates),
         loadIssues(slug, pid),
       ]);
-    } catch { setLoading(false); }
+    } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load workspace data"); setLoading(false); }
   }
 
   async function selectProject(pid: string, slug = wsSlug) {

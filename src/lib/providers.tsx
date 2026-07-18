@@ -72,7 +72,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       setProfile(json.data.profile);
       const bootKey = `bootstrapped:${json.data.user.id}`;
       if (typeof window !== "undefined" && !localStorage.getItem(bootKey)) {
-        await fetch("/api/bootstrap", { method: "POST", credentials: "same-origin" }).catch((e) =>
+        await fetch("/api/bootstrap", { method: "POST", credentials: "same-origin", headers: { Authorization: `Bearer ${token}` } }).catch((e) =>
           logger.warn("bootstrap failed", { userId: json.data.user.id }, e)
         );
         localStorage.setItem(bootKey, "1");
