@@ -2,6 +2,8 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { Toaster } from "sonner";
+import { getToken } from "./api";
 import { logger } from "./logger";
 
 interface User { id: string; email: string; }
@@ -39,10 +41,31 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const refresh = useCallback(async () => {
+    const getRefreshToken = () => typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
+    let token = getToken();
+    if (!token) { setUser(null); setProfile(null); setReady(true); return; }
     try {
-      const res = await fetch("/api/auth/me", { credentials: "same-origin" });
+      let res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        const rt = getRefreshToken();
+        if (rt) {
+          const refreshRes = await fetch("/api/auth/refresh", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refresh_token: rt }),
+          });
+          const refreshJson = await refreshRes.json();
+          if (refreshJson.success) {
+            localStorage.setItem("token", refreshJson.data.token);
+            if (refreshJson.data.refresh_token) localStorage.setItem("refresh_token", refreshJson.data.refresh_token);
+            token = refreshJson.data.token;
+            res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } });
+          }
+        }
+      }
       const json = await res.json();
       if (!json.success) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("refresh_token");
         router.push("/login");
         return;
       }
@@ -68,6 +91,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AuthContext.Provider value={{ user, profile, ready, refresh }}>
         {children}
+        <Toaster position="bottom-right" richColors closeButton />
       </AuthContext.Provider>
     </QueryClientProvider>
   );

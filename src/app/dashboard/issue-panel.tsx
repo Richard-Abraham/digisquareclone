@@ -7,8 +7,9 @@ import { IssueDetailCore } from "@/components/issue/IssueDetailCore";
 
 interface Member { user_id: string; profile: { display_name: string } | null; }
 interface State { id: string; name: string; group_name: string; color: string; }
+interface ActivityEvent { id: string; kind: string; created_at: string; snippet: string | null; actor: { display_name?: string } | null; metadata: any; }
 
-interface Issue { id: string; name: string; priority: string; sequence_id: number; state_id: string; is_bug: boolean; target_date: string | null; created_at: string; created_by: string; creator: { display_name?: string } | null; state: State | null; }
+interface Issue { id: string; name: string; priority: string; sequence_id: number; state_id: string; is_bug: boolean; target_date: string | null; created_at: string; created_by: string; creator: { display_name?: string } | null; assignees?: { user_id?: string; display_name?: string }[]; state: State | null; }
 
 interface IssuePanelProps {
   issueId: string;
@@ -23,6 +24,21 @@ interface IssuePanelProps {
 export default function IssuePanel({ issueId, wsSlug, projId, states, onClose, onIssueUpdated }: IssuePanelProps) {
   const router = useRouter();
   const [issue, setIssue] = useState<Issue | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [bundleLoading, setBundleLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadBundle() {
+      try {
+        const b = await api<{ issue: Issue; members: Member[]; activity: ActivityEvent[] }>(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${issueId}/detail`);
+        setIssue(b.issue);
+        setMembers(b.members);
+        setActivity(b.activity);
+      } catch {} finally { setBundleLoading(false); }
+    }
+    loadBundle();
+  }, [issueId, wsSlug, projId]);
 
   // M2 fix: Escape to close + body scroll lock while panel is open.
   useEffect(() => {
@@ -60,17 +76,29 @@ export default function IssuePanel({ issueId, wsSlug, projId, states, onClose, o
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
-          <IssueDetailCore
-            issueId={issueId}
-            wsSlug={wsSlug}
-            projId={projId}
-            states={states}
-            onIssueUpdated={(updated) => {
-              setIssue(updated as Issue);
-              onIssueUpdated?.(updated as Issue);
-            }}
-            compact
-          />
+          {bundleLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="flex flex-col items-center gap-3">
+                <div className="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-600 animate-pulse-soft" />
+                <p className="text-sm text-text-secondary">Loading task...</p>
+              </div>
+            </div>
+          ) : (
+            <IssueDetailCore
+              issueId={issueId}
+              wsSlug={wsSlug}
+              projId={projId}
+              states={states}
+              issue={issue}
+              members={members}
+              activity={activity}
+              onIssueUpdated={(updated) => {
+                setIssue(updated as Issue);
+                onIssueUpdated?.(updated as Issue);
+              }}
+              compact
+            />
+          )}
         </div>
       </div>
     </>

@@ -7,13 +7,15 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useAuth } from "@/lib/providers";
+import { api } from "@/lib/api";
 import { deriveIdentifier } from "@/lib/tasks";
 import { useRealtimeIssues } from "@/lib/realtime";
-import { TasksIcon } from "@/components/icons";
+import { TasksIcon, SpinnerIcon, UserIcon, ChartIcon, CheckIcon } from "@/components/icons";
+import { StatCard, ChartCard, DonutChart, BarChart, chartColors } from "@/components/charts";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Drawer } from "@/components/ui/Drawer";
-import { SpinnerIcon } from "@/components/icons";
+import { CreateTaskDrawer } from "@/components/issue/CreateTaskDrawer";
 import IssuePanel from "./issue-panel";
 import {
   KanbanColumn, DragPreviewCard, GROUPS, PRIORITIES, PRIO_META,
@@ -41,19 +43,15 @@ export default function IssuesPage() {
   const [filterAssignee, setFilterAssignee] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newPriority, setNewPriority] = useState("none");
-  const [newAssigneeIds, setNewAssigneeIds] = useState<string[]>([]);
-  const [newBug, setNewBug] = useState(false);
   const [wsSlug, setWsSlug] = useState("");
   const [projId, setProjId] = useState("");
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [showProj, setShowProj] = useState(false);
   const [newProjName, setNewProjName] = useState("");
   const [creatingProj, setCreatingProj] = useState(false);
-  const [creatingIssue, setCreatingIssue] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showInsights, setShowInsights] = useState(true);
   const [columns, setColumns] = useState<Record<Group, Issue[]>>(emptyColumns());
   const router = useRouter();
 
@@ -66,31 +64,29 @@ export default function IssuesPage() {
   }, [ready]);
 
   async function loadAll() {
-    const wsRes = await fetch("/api/workspaces", { credentials: "same-origin" });
-    const wsJson = await wsRes.json();
-    if (!wsJson.success || !wsJson.data.length) { setLoading(false); return; }
-    const slug = wsJson.data[0].slug;
-    setWsSlug(slug);
-    const projRes = await fetch(`/api/workspaces/${slug}/projects`, { credentials: "same-origin" });
-    const projJson = await projRes.json();
-    if (!projJson.success || !projJson.data.length) { setLoading(false); return; }
-    setProjects(projJson.data);
-    const lastPid = localStorage.getItem(`lastProject:${slug}`);
-    const pid = (lastPid && projJson.data.some((p: any) => p.id === lastPid)) ? lastPid : projJson.data[0].id;
-    setProjId(pid);
-    await Promise.all([
-      fetch(`/api/workspaces/${slug}/members`, { credentials: "same-origin" }).then(r => r.json()).then(j => { if (j.success) setMembers((j.data.members || []).map((m: any) => ({ user_id: m.user_id, profile: m.profile }))); }),
-      fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { credentials: "same-origin" }).then(r => r.json()).then(j => { if (j.success) setStates(j.data); }),
-      loadIssues(slug, pid),
-    ]);
+    try {
+      const ws = await api<{ slug: string }[]>("/api/workspaces");
+      if (!ws.length) { setLoading(false); return; }
+      const slug = ws[0].slug;
+      setWsSlug(slug);
+      const proj = await api<{ id: string; name: string }[]>(`/api/workspaces/${slug}/projects`);
+      if (!proj.length) { setLoading(false); return; }
+      setProjects(proj);
+      const lastPid = localStorage.getItem(`lastProject:${slug}`);
+      const pid = (lastPid && proj.some((p) => p.id === lastPid)) ? lastPid : proj[0].id;
+      setProjId(pid);
+      await Promise.all([
+        api<{ members: { user_id: string; profile: { display_name: string } | null }[] }>(`/api/workspaces/${slug}/members`).then(r => setMembers(r.members.map((m: any) => ({ user_id: m.user_id, profile: m.profile })))),
+        api<State[]>(`/api/workspaces/${slug}/projects/${pid}/states`).then(setStates),
+        loadIssues(slug, pid),
+      ]);
+    } catch { setLoading(false); }
   }
 
   async function selectProject(pid: string, slug = wsSlug) {
     setProjId(pid); setPage(1);
     localStorage.setItem(`lastProject:${slug}`, pid);
-    const sRes = await fetch(`/api/workspaces/${slug}/projects/${pid}/states`, { credentials: "same-origin" });
-    const sJson = await sRes.json();
-    if (sJson.success) setStates(sJson.data);
+    try { setStates(await api<State[]>(`/api/workspaces/${slug}/projects/${pid}/states`)); } catch {}
     await loadIssues(slug, pid);
   }
 
@@ -98,12 +94,8 @@ export default function IssuesPage() {
     if (!newProjName.trim()) return;
     setCreatingProj(true);
     try {
-      const res = await fetch(`/api/workspaces/${wsSlug}/projects`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
-        body: JSON.stringify({ name: newProjName }),
-      });
-      const json = await res.json();
-      if (json.success) { setProjects(p => [json.data, ...p]); setShowProj(false); setNewProjName(""); selectProject(json.data.id); }
+      const p = await api<{ id: string }>(`/api/workspaces/${wsSlug}/projects`, { method: "POST", body: { name: newProjName } });
+      setProjects(prev => [p as any, ...prev]); setShowProj(false); setNewProjName(""); selectProject(p.id);
     } finally { setCreatingProj(false); }
   }
 
@@ -116,10 +108,10 @@ export default function IssuesPage() {
     if (filterSearch) params.set("search", filterSearch);
     params.set("page", String(pg || page));
     params.set("pageSize", String(PAGE_SIZE));
-    const res = await fetch(`/api/workspaces/${s}/projects/${p}/issues?${params}`, { credentials: "same-origin" });
-    const json = await res.json();
-    if (json.success) { setIssues(json.data.issues); setTotal(json.data.total); }
-    setLoading(false);
+    try {
+      const res = await api<{ issues: Issue[]; total: number }>(`/api/workspaces/${s}/projects/${p}/issues?${params}`);
+      setIssues(res.issues); setTotal(res.total);
+    } catch {} finally { setLoading(false); }
   }, [wsSlug, projId, filterState, filterPriority, filterAssignee, filterSearch, page]);
 
   useEffect(() => { if (wsSlug && projId) { setPage(1); loadIssues(); } }, [filterState, filterPriority, filterAssignee, filterSearch]);
@@ -134,27 +126,20 @@ export default function IssuesPage() {
   }, [issues]);
   useEffect(() => { setColumns(derivedColumns); }, [derivedColumns]);
 
-  async function createIssue() {
-    if (!newName.trim()) return;
-    setCreatingIssue(true);
-    try {
-      const res = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
-        body: JSON.stringify({ name: newName, priority: newPriority, assignee_ids: newAssigneeIds, is_bug: newBug }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setNewName(""); setNewBug(false); setNewAssigneeIds([]); setShowCreate(false);
-        setPage(1); setIssues(prev => [json.data, ...prev]); setTotal(t => t + 1);
-      }
-    } finally { setCreatingIssue(false); }
-  }
-
-  function toggleNewAssignee(uid: string) {
-    setNewAssigneeIds((cur) => cur.includes(uid) ? cur.filter((x) => x !== uid) : [...cur, uid]);
-  }
-
   const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  // Derived stats
+  const statsByPriority: Record<string, number> = { urgent: 0, high: 0, medium: 0, low: 0, none: 0 };
+  const statsByState: Record<string, number> = {};
+  for (const i of issues) {
+    const g = i.state?.group_name || "backlog";
+    statsByState[g] = (statsByState[g] || 0) + 1;
+    if (statsByPriority[i.priority] !== undefined) statsByPriority[i.priority]++;
+  }
+  const priorityChartData = Object.entries(statsByPriority)
+    .filter(([, v]) => v > 0)
+    .map(([k, v]) => ({ name: k, count: v }));
+  const stateChartData = Object.entries(statsByState).map(([k, v]) => ({ name: k, count: v }));
 
   // ---- Drag and drop ----
   const sensors = useSensors(
@@ -178,34 +163,9 @@ export default function IssuesPage() {
   }
 
   function handleDragOver(e: DragOverEvent) {
-    const { active, over } = e;
-    if (!over) return;
-    const activeIdLocal = active.id as string;
-
-    let overGroup: Group | null = null;
-    if (GROUPS.includes(over.id as Group)) overGroup = over.id as Group;
-    else overGroup = groupOf(over.id as string);
-    const fromGroup = groupOf(activeIdLocal);
-    if (!overGroup || !fromGroup || fromGroup === overGroup) return;
-    if (!states.some((s) => s.group_name === overGroup)) return;
-
-    setColumns((prev) => {
-      const next = { ...prev };
-      const fromItems = [...prev[fromGroup!]];
-      const toItems = [...prev[overGroup!]];
-      const idx = fromItems.findIndex((i) => i.id === activeIdLocal);
-      if (idx < 0) return prev;
-      const [moved] = fromItems.splice(idx, 1);
-      let insertAt = toItems.length;
-      if (!GROUPS.includes(over.id as Group)) {
-        const oi = toItems.findIndex((i) => i.id === over.id);
-        if (oi >= 0) insertAt = oi;
-      }
-      toItems.splice(insertAt, 0, moved);
-      next[fromGroup!] = fromItems;
-      next[overGroup!] = toItems;
-      return next;
-    });
+    // Cross-column moves are handled entirely in handleDragEnd.
+    // The SortableContext items must remain stable during drag
+    // for @dnd-kit/sortable v10 to track the active item correctly.
   }
 
   async function handleDragEnd(e: DragEndEvent) {
@@ -270,19 +230,13 @@ export default function IssuesPage() {
 
     try {
       if (stateChanged && targetState) {
-        const r = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${movedId}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
-          body: JSON.stringify({ state_id: targetState.id }),
+        await api(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${movedId}`, {
+          method: "PATCH", body: { state_id: targetState.id },
         });
-        const j = await r.json();
-        if (!j.success) throw new Error(j.error);
       }
-      const r = await fetch(`/api/workspaces/${wsSlug}/projects/${projId}/issues/reorder`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
-        body: JSON.stringify({ items: newOrder }),
+      await api(`/api/workspaces/${wsSlug}/projects/${projId}/issues/reorder`, {
+        method: "PATCH", body: { items: newOrder },
       });
-      const j = await r.json();
-      if (!j.success) throw new Error(j.error);
     } catch {
       setIssues(prevIssues); // rollback (re-derives columns)
     }
@@ -310,43 +264,96 @@ export default function IssuesPage() {
   );
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="section-header">
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="section-title">Tasks</h1>
-            <p className="section-desc">{total} total tasks</p>
+    <div className="flex flex-col h-full">
+      {/* Header bar */}
+      <div className="flex-shrink-0 border-b border-border-subtle bg-surface-1 px-4 sm:px-6 py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="hidden sm:flex size-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 shadow-sm items-center justify-center flex-shrink-0 text-white">
+              <TasksIcon />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold text-text-primary font-display tracking-tight">Board</h1>
+                <span className="text-text-placeholder">/</span>
+                {projects.length > 0 && (
+                  <select value={projId} onChange={e => selectProject(e.target.value)}
+                    className="select text-xs !w-auto !py-1 !px-2.5 !pr-7 font-semibold !bg-surface-2 !border-border hover:!border-border-accent rounded-lg cursor-pointer transition-colors">
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                )}
+              </div>
+              <p className="text-[11px] text-text-tertiary mt-0.5">
+                {total} task{total === 1 ? "" : "s"} · {statsByState.started || 0} in progress · {statsByState.completed || 0} done
+              </p>
+            </div>
           </div>
-          {projects.length > 0 && (
-            <select value={projId} onChange={e => selectProject(e.target.value)} className="select text-xs sm:ml-2 -mt-1">
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          )}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={() => setShowInsights(v => !v)}
+              className={`btn-sm ${showInsights ? "btn-primary" : "btn-secondary"}`}>
+              <ChartIcon />
+              <span className="hidden sm:inline">Insights</span>
+            </button>
+            <Button variant="secondary" size="sm" onClick={() => setShowProj(true)}>New Project</Button>
+            <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+              New Task
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2 flex-shrink-0">
-          <Button variant="secondary" size="sm" onClick={() => setShowProj(true)}>New Project</Button>
-          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>New Task</Button>
+
+        {/* Filter toolbar */}
+        <div className="flex items-center gap-2 mt-4 flex-wrap">
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" />
+            </svg>
+            <input value={filterSearch} onChange={e => setFilterSearch(e.target.value)} placeholder="Search tasks..."
+              className="input-sm !pl-8 w-[220px] rounded-lg" />
+          </div>
+          <div className="h-5 w-px bg-border hidden sm:block" />
+          <select value={filterState} onChange={e => setFilterState(e.target.value)} className="select text-xs !w-auto min-w-[110px] !py-1.5 rounded-lg">
+            <option value="">All states</option>
+            {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="select text-xs !w-auto min-w-[110px] !py-1.5 rounded-lg">
+            <option value="">All priorities</option>
+            {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_META[p].label}</option>)}
+          </select>
+          <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="select text-xs !w-auto min-w-[130px] !py-1.5 rounded-lg">
+            <option value="">All members</option>
+            {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profile?.display_name || "User"}</option>)}
+          </select>
+          {(filterState || filterPriority || filterAssignee || filterSearch) && (
+            <button onClick={() => { setFilterState(""); setFilterPriority(""); setFilterAssignee(""); setFilterSearch(""); }}
+              className="btn-ghost btn-sm text-xs rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors">Clear</button>
+          )}
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 mb-5 flex-wrap">
-        <select value={filterState} onChange={e => setFilterState(e.target.value)} className="select text-xs w-auto min-w-[120px]">
-          <option value="">All states</option>
-          {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-        <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="select text-xs w-auto min-w-[120px]">
-          <option value="">All priorities</option>
-          {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_META[p].label}</option>)}
-        </select>
-        <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="select text-xs w-auto min-w-[140px]">
-          <option value="">All members</option>
-          {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profile?.display_name || "User"}</option>)}
-        </select>
-        <input value={filterSearch} onChange={e => setFilterSearch(e.target.value)} placeholder="Search tasks..."
-          className="input-sm w-auto min-w-[200px]" />
-      </div>
+      {/* Insights (collapsible) */}
+      {showInsights && issues.length > 0 && (
+        <div className="flex-shrink-0 px-4 sm:px-6 py-4 border-b border-border-subtle bg-surface animate-fade-in space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard label="Total Tasks" value={total} icon={<TasksIcon />} />
+            <StatCard label="Team Members" value={members.length} icon={<UserIcon />} />
+            <StatCard label="Active" value={statsByState.started || 0} sub="In Progress" icon={<ChartIcon />} color={chartColors.amber} />
+            <StatCard label="Completed" value={statsByState.completed || 0} sub="Done this sprint" icon={<CheckIcon size={18} />} color={chartColors.emerald} />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {priorityChartData.length > 0 && (
+              <ChartCard title="Priority Distribution">
+                <DonutChart data={priorityChartData} dataKey="count" nameKey="name" colors={[chartColors.red, chartColors.amber, chartColors.primary, chartColors.slate, "#CBD5E1"]} height={200} innerRadius={40} outerRadius={70} />
+              </ChartCard>
+            )}
+            {stateChartData.length > 0 && (
+              <ChartCard title="State Breakdown">
+                <BarChart data={stateChartData} xKey="name" yKey="count" color={chartColors.primary} height={180} barSize={36} />
+              </ChartCard>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Kanban board */}
       <DndContext
@@ -357,22 +364,24 @@ export default function IssuesPage() {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex gap-4 overflow-x-auto pb-2 snap-x snap-proximity lg:grid lg:grid-cols-5">
-          {GROUPS.map((group) => {
-            const stateInfo = states.find(s => s.group_name === group);
-            const droppable = !!stateInfo;
-            return (
-              <KanbanColumn
-                key={group}
-                group={group}
-                items={columns[group]}
-                stateInfo={stateInfo}
-                droppable={droppable}
-                activeId={activeId}
-                onOpen={setSelectedIssue}
-              />
-            );
-          })}
+        <div className="flex-1 min-h-[420px] overflow-x-auto overflow-y-hidden px-4 sm:px-6 py-5 bg-surface">
+          <div className="flex gap-4 h-full snap-x snap-proximity items-start">
+            {GROUPS.map((group) => {
+              const stateInfo = states.find(s => s.group_name === group);
+              const droppable = !!stateInfo;
+              return (
+                <KanbanColumn
+                  key={group}
+                  group={group}
+                  items={columns[group]}
+                  stateInfo={stateInfo}
+                  droppable={droppable}
+                  activeId={activeId}
+                  onOpen={setSelectedIssue}
+                />
+              );
+            })}
+          </div>
         </div>
         <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.18,0.67,0.6,1.22)" }}>
           {activeIssue ? <DragPreviewCard issue={activeIssue} stateColor={activeStateColor} /> : null}
@@ -381,7 +390,7 @@ export default function IssuesPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 mt-8">
+        <div className="flex-shrink-0 flex items-center justify-center gap-3 py-3 border-t border-border-subtle">
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
             className="btn-secondary btn-sm">Previous</button>
           <div className="flex items-center gap-2">
@@ -419,51 +428,19 @@ export default function IssuesPage() {
         </div>
       </Drawer>
 
-      {/* Create issue drawer */}
-      <Drawer open={showCreate} onClose={() => setShowCreate(false)} title="Create Task" description="Add a new task to the current project." initialWidth={560} maxWidth={720}
-        footer={<>
-          <Button variant="secondary" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
-          <Button variant="primary" size="sm" onClick={createIssue} disabled={creatingIssue || !newName.trim()}>
-            {creatingIssue ? <span className="flex items-center gap-2"><SpinnerIcon size={14} className="animate-spin" /> Creating...</span> : "Create task"}
-          </Button>
-        </>}>
-        <div className="space-y-5">
-          <Input label="Task name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Fix login redirect"
-            autoFocus onKeyDown={e => e.key === "Enter" && createIssue()} />
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Priority</label>
-              <select value={newPriority} onChange={e => setNewPriority(e.target.value)} className="select">
-                {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_META[p].label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Type</label>
-              <label className="flex items-center gap-2.5 h-[40px] text-sm text-text-secondary cursor-pointer">
-                <input type="checkbox" checked={newBug} onChange={e => setNewBug(e.target.checked)}
-                  className="size-4 rounded border-border text-primary focus:ring-primary-200" />
-                Mark as bug
-              </label>
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">Assignees</label>
-            <div className="flex flex-wrap gap-2">
-              {members.length === 0 && <p className="text-xs text-text-tertiary font-light">No members yet.</p>}
-              {members.map(m => {
-                const on = newAssigneeIds.includes(m.user_id);
-                return (
-                  <button key={m.user_id} type="button" onClick={() => toggleNewAssignee(m.user_id)}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition-all duration-150
-                      ${on ? "bg-primary-50 border-primary-300 text-primary font-medium dark:bg-primary-500/15 dark:border-primary-500/40" : "border-border text-text-secondary hover:bg-surface-2 hover:border-border-accent"}`}>
-                    {m.profile?.display_name || m.user_id.slice(0, 6)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </Drawer>
+      {/* Create task drawer */}
+      <CreateTaskDrawer
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        wsSlug={wsSlug}
+        projId={projId}
+        members={members}
+        onCreated={() => {
+          setShowCreate(false);
+          setPage(1);
+          loadIssues(undefined, undefined, 1);
+        }}
+      />
 
       {/* Slide-over panel */}
       {selectedIssue && (
@@ -482,3 +459,4 @@ export default function IssuesPage() {
     </div>
   );
 }
+

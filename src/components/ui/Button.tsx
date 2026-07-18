@@ -1,6 +1,6 @@
 "use client";
 import { forwardRef } from "react";
-import { cn } from "@/lib/cn";
+import clsx from "clsx";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg" | "icon";
@@ -25,7 +25,7 @@ const sizeClass: Record<Size, string> = {
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = "primary", size = "md", className, ...props }, ref) => (
-    <button ref={ref} className={cn(variantClass[variant], sizeClass[size], className)} {...props} />
+    <button ref={ref} className={clsx(variantClass[variant], sizeClass[size], className)} {...props} />
   )
 );
 Button.displayName = "Button";

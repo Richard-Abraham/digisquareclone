@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name: display_name },
+      user_metadata: { full_name: display_name || email.split("@")[0] },
     });
     if (ae) return err(ae.message, { status: 400 });
 

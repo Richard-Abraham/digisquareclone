@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   description: "The project management workspace built for modern teams. Plan, track, and ship work together.",
   keywords: ["project management", "task tracking", "kanban", "team collaboration", "standups"],
   authors: [{ name: "Digisystem" }],
+  icons: { icon: "/icon.png" },
   openGraph: {
     title: "Digisystem",
     description: "The project management workspace built for modern teams.",

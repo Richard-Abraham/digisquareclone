@@ -114,7 +114,22 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const reviewerIds = Array.from(new Set(body.reviewer_ids || []));
     const tagIds = Array.from(new Set(body.tag_ids || []));
 
+    // If the caller did not supply a state, make sure the project has at least one
+    // state before invoking the atomic function. A missing default state produces
+    // a confusing low-level Postgres error, so we fail fast with a clear message.
+    if (!body.state_id) {
+      const { data: anyState } = await getAdmin()
+        .from("states")
+        .select("id")
+        .eq("project_id", params.projectId)
+        .limit(1)
+        .single();
+      if (!anyState) return err("Project has no states. Create a state first.", 400);
+    }
+
     // R1 + R2: atomic issue creation via PostgreSQL function (transaction + serialized sequence).
+    // Empty arrays are sent as NULL because some Supabase clients cannot infer the
+    // uuid[] element type for an empty literal `{}`, which causes a 400 RPC error.
     const { data: issue, error: ie } = await getAdmin().rpc("create_issue_atomic", {
       p_project_id: params.projectId,
       p_workspace_id: project.workspace_id,
@@ -128,15 +143,37 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       p_start_date: body.start_date || null,
       p_target_date: body.target_date || null,
       p_parent_id: body.parent_id || null,
-      p_assignee_ids: assigneeIds,
-      p_reviewer_ids: reviewerIds,
-      p_tag_ids: tagIds,
+      p_assignee_ids: assigneeIds.length ? assigneeIds : null,
+      p_reviewer_ids: reviewerIds.length ? reviewerIds : null,
+      p_tag_ids: tagIds.length ? tagIds : null,
     });
 
-    if (ie) return err(ie.message, 400);
+    if (ie) {
+      console.error("create_issue_atomic failed:", ie);
+      return err(ie.message, 400);
+    }
 
     // Grant project access and notify recipients (outside the DB transaction).
     await ensureProjectMembers(params.projectId, [user.id, ...assigneeIds, ...reviewerIds]);
+
+    // Enrich the created issue with assignee/creator profiles so the kanban board
+    // can render it immediately without an extra round-trip.
+    const profileIds = Array.from(new Set([issue.created_by, issue.assignee_id, ...assigneeIds].filter(Boolean)));
+    const { data: profiles } = profileIds.length
+      ? await getAdmin().from("profiles").select("user_id, display_name").in("user_id", profileIds)
+      : { data: [] };
+    const pm = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+
+    const enrichedIssue = {
+      ...issue,
+      assignee: issue.assignee_id ? pm.get(issue.assignee_id) || null : null,
+      assignees: assigneeIds.map((id) => pm.get(id) || { user_id: id }),
+      creator: issue.created_by ? pm.get(issue.created_by) || null : null,
+      tag_ids: tagIds,
+      subtask_total: 0,
+      subtask_done: 0,
+      changes_requested: false,
+    };
 
     await writeNotifications(assigneeIds, {
       workspaceId: project.workspace_id, actorId: user.id,
@@ -152,7 +189,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       targetType: "issue", issueId: issue.id, projectId: params.projectId, snippet: body.name,
     });
 
-    return ok(issue, 201);
+    return ok(enrichedIssue, 201);
   } catch (e) {
     logger.error("POST /api/workspaces/[slug]/projects/[projectId]/issues failed", e);
     return err("Internal server error", { status: 500 });

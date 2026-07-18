@@ -8,6 +8,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { Logo } from "@/components/ui/Logo";
 import {
   EyeIcon, EyeOffIcon, SpinnerIcon, MailIcon, LockIcon, ArrowRightIcon,
   SparklesIcon, KanbanIcon, CheckIcon, UserIcon,
@@ -57,6 +58,8 @@ export default function LoginPage() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error || "Request failed");
 
+      if (json.data.token) localStorage.setItem("token", json.data.token);
+      if (json.data.refresh_token) localStorage.setItem("refresh_token", json.data.refresh_token);
       if (values.remember) localStorage.setItem(REMEMBER_KEY, values.email);
       else localStorage.removeItem(REMEMBER_KEY);
       toast.success("Signed in successfully");
@@ -123,8 +126,8 @@ export default function LoginPage() {
 
         <div className="relative z-10 flex flex-col justify-between px-14 py-14 xl:px-20 xl:py-16 text-white w-full">
           <div className="flex items-center gap-3.5">
-            <div className="size-12 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-xl">
-              <span className="text-2xl font-extrabold font-display">D</span>
+            <div className="size-12 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-xl p-2">
+              <Logo size={40} showWordmark={false} className="[&>div]:rounded-[10px] [&>div]:ring-0 [&>div]:bg-transparent" />
             </div>
             <span className="text-[22px] font-bold tracking-tight font-display">Digisystem</span>
           </div>
@@ -182,9 +185,7 @@ export default function LoginPage() {
 
         <div className="relative flex items-center justify-between px-8 sm:px-12 py-7">
           <div className="flex items-center gap-3 lg:hidden">
-            <div className="size-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center shadow-lg">
-              <span className="text-base font-extrabold text-white font-display">D</span>
-            </div>
+            <Logo size={32} showWordmark={false} />
             <span className="text-lg font-bold text-text-primary font-display">Digisystem</span>
           </div>
           <div className="lg:hidden" />

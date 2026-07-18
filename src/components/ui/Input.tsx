@@ -1,6 +1,6 @@
 "use client";
 import { forwardRef } from "react";
-import { cn } from "@/lib/cn";
+import clsx from "clsx";
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -21,7 +21,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           id={inputId}
-          className={cn("input", error && "border-red-400 focus:border-red-400 focus:ring-red-100", className)}
+          className={clsx("input", error && "border-red-400 focus:border-red-400 focus:ring-red-100", className)}
           aria-invalid={!!error}
           {...props}
         />

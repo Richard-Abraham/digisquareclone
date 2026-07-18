@@ -20,13 +20,24 @@ export async function POST(req: NextRequest) {
 
     const { email, password } = parsed.data;
     const { data, error: ae } = await getAdmin().auth.signInWithPassword({ email, password });
-    if (ae || !data?.user) return err("Invalid credentials", { status: 401 });
+    if (ae || !data?.user) {
+      console.error("[login] Supabase signInWithPassword error:", ae?.message, ae?.code);
+      return err("Invalid credentials", { status: 401 });
+    }
 
-    const { data: profile } = await getAdmin().from("profiles").select("*").eq("user_id", data.user.id).single();
+    let { data: profile } = await getAdmin().from("profiles").select("*").eq("user_id", data.user.id).maybeSingle();
+    if (!profile) {
+      const displayName = data.user.email?.split("@")[0] || "User";
+      const { data: newProfile } = await getAdmin().from("profiles")
+        .insert({ user_id: data.user.id, display_name: displayName })
+        .select().single();
+      profile = newProfile;
+    }
 
     const accessToken = data.session?.access_token;
+    const refreshToken = data.session?.refresh_token;
     const res = NextResponse.json(
-      { success: true, data: { user: { id: data.user.id, email: data.user.email }, profile } },
+      { success: true, data: { token: accessToken, refresh_token: refreshToken, user: { id: data.user.id, email: data.user.email }, profile } },
       { status: 200 }
     );
     if (accessToken) {
@@ -36,6 +47,15 @@ export async function POST(req: NextRequest) {
         sameSite: "lax",
         path: "/",
         maxAge: 60 * 60 * 24 * 7,
+      });
+    }
+    if (refreshToken) {
+      res.cookies.set("sb-refresh-token", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30,
       });
     }
     return res;

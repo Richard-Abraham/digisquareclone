@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { cn } from "@/lib/cn";
+import clsx from "clsx";
 import { CloseIcon, SpinnerIcon } from "@/components/icons";
 
 interface DrawerProps {
@@ -113,7 +113,7 @@ export function Drawer({
       {/* Panel */}
       <div
         ref={panelRef}
-        className={cn(
+        className={clsx(
           "relative h-full bg-surface-1 border-l border-border shadow-[-8px_0_30px_rgba(0,0,0,0.12)] flex flex-col",
           "animate-slide-in-right transition-[width] duration-200 ease-out",
           dragging && "transition-none",
@@ -124,7 +124,7 @@ export function Drawer({
         {!maximized && (
           <div
             onMouseDown={onMouseDown}
-            className={cn(
+            className={clsx(
               "absolute top-0 left-0 bottom-0 w-1.5 cursor-col-resize flex items-center justify-center group z-10",
               "hover:bg-primary/20 transition-colors",
               dragging && "bg-primary/30",
@@ -132,7 +132,7 @@ export function Drawer({
             aria-label="Drag to resize"
             role="separator"
           >
-            <div className={cn(
+            <div className={clsx(
               "w-0.5 h-12 rounded-full bg-border transition-colors",
               "group-hover:bg-primary/40",
               dragging && "bg-primary/60",

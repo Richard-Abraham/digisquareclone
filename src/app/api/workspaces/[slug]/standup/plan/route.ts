@@ -7,6 +7,8 @@ import { todayKey } from "@/lib/tasks";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 
+const errLocked = () => err("This standup day has ended and cannot be edited", 409);
+
 // Save today's plan text + the ordered set of planned tasks.
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
   try {
@@ -17,13 +19,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
     const access = await getWorkspaceAccess(params.slug, user.id);
     if (!access) return err("Access denied", 403);
-    const { plan, issue_ids } = await req.json() as { plan?: string; issue_ids?: string[] };
+    const { plan, issue_ids, date } = await req.json() as { plan?: string; issue_ids?: string[]; date?: string };
     const ids = issue_ids || [];
-    const date = todayKey();
+    const dateKey = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayKey();
+    if (dateKey < todayKey()) return errLocked();
     const wsId = access.workspace.id;
 
     const { data: standup, error: e } = await getAdmin().from("daily_standups")
-      .upsert({ workspace_id: wsId, user_id: user.id, date, plan: plan ?? null, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,user_id,date" })
+      .upsert({ workspace_id: wsId, user_id: user.id, date: dateKey, plan: plan ?? null, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,user_id,date" })
       .select().single();
     if (e) return err(e.message, 400);
 

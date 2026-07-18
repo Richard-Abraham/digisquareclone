@@ -3,10 +3,12 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/providers";
+import { clearToken } from "@/lib/api";
 import { useUnreadCount } from "@/lib/hooks";
 import { useKeyboardShortcuts } from "@/lib/keyboard";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { HelpModal } from "@/components/ui/HelpModal";
+import { Logo } from "@/components/ui/Logo";
 import { SpinnerIcon } from "@/components/icons";
 import { logger } from "@/lib/logger";
 import {
@@ -90,44 +92,45 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar */}
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-64 bg-surface-1 border-r border-border flex flex-col
+        bg-gradient-to-b from-surface-1 to-surface
         transform transition-transform duration-200 ease-in-out
         lg:static lg:translate-x-0
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
         {/* Logo */}
-        <div className="flex items-center gap-3 px-5 h-16 border-b border-border-subtle flex-shrink-0">
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden btn-ghost btn-icon btn-sm mr-1" aria-label="Close sidebar">
+        <div className="flex items-center gap-2 px-5 h-16 border-b border-border-subtle flex-shrink-0">
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden btn-ghost btn-icon btn-sm -ml-2 mr-1" aria-label="Close sidebar">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
-          <div className="size-9 rounded-xl bg-gradient-to-br from-primary to-primary-600 shadow-sm flex items-center justify-center flex-shrink-0">
-            <span className="text-base font-extrabold text-white">D</span>
-          </div>
-          <span className="font-bold text-base text-text-primary">Digisystem</span>
+          <Logo size={34} wordmarkClassName="text-[17px]" />
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto">
+        <nav className="flex-1 px-3 py-5 overflow-y-auto">
           {navGroups.map((group) => (
-            <div key={group.label} className="mb-5">
-              <p className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">{group.label}</p>
-              <div className="space-y-0.5">
+            <div key={group.label} className="mb-6">
+              <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-text-tertiary">{group.label}</p>
+              <div className="space-y-1">
                 {group.items.map((item) => {
                   const active = item.pattern(pathname);
                   return (
                     <Link key={item.href} href={item.href}
-                      className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150
+                      className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
                         ${active
-                          ? "bg-primary-50 text-primary dark:bg-primary-500/10 dark:text-primary-300"
-                          : "text-text-secondary hover:bg-surface-2 hover:text-text-primary"
+                          ? "bg-gradient-to-r from-primary-50 to-primary-50/40 text-primary shadow-sm dark:from-primary-500/15 dark:to-primary-500/5 dark:text-primary-300"
+                          : "text-text-secondary hover:bg-surface-2 hover:text-text-primary hover:translate-x-0.5"
                         }`}>
-                      <span className={`flex-shrink-0 ${active ? "text-primary" : "text-text-tertiary group-hover:text-text-secondary"}`}>
+                      {active && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-primary" />
+                      )}
+                      <span className={`flex-shrink-0 transition-colors ${active ? "text-primary" : "text-text-tertiary group-hover:text-text-secondary"}`}>
                         {item.icon}
                       </span>
                       <span className="flex-1">{item.label}</span>
                       {item.badge !== undefined && item.badge > 0 && (
-                        <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                        <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm animate-pulse-soft">
                           {item.badge > 99 ? "99+" : item.badge}
                         </span>
                       )}
@@ -141,8 +144,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* User footer */}
         <div className="border-t border-border-subtle p-3 flex-shrink-0">
-          <div className="flex items-center gap-3 rounded-lg px-3 py-2.5">
-            <div className="avatar-sm bg-gradient-to-br from-primary-300 to-primary-500 text-white shadow-sm">
+          <div className="flex items-center gap-3 rounded-xl px-2.5 py-2.5 bg-surface-2/60 border border-border-subtle transition-colors hover:bg-surface-2">
+            <div className="avatar-md bg-gradient-to-br from-primary-400 to-primary-600 text-white shadow-sm ring-2 ring-surface-1">
               {profile?.display_name?.[0]?.toUpperCase() || "U"}
             </div>
             <div className="flex-1 min-w-0">
@@ -151,15 +154,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <p className="text-[11px] text-text-tertiary truncate">{user.email}</p>
               </Link>
             </div>
-            <button onClick={async () => {
-              setLoggingOut(true);
-              try { await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }); } catch (e) { logger.warn("logout request failed", undefined, e); }
-              router.push("/login");
-            }}
-              disabled={loggingOut} className="btn-ghost btn-icon btn-sm text-text-tertiary hover:text-red-500 shrink-0" title="Sign out" aria-label="Sign out">
-              {loggingOut ? <SpinnerIcon size={16} className="animate-spin" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>}
-            </button>
-            <ThemeToggle size="sm" className="shrink-0" />
+            <div className="flex items-center gap-0.5 shrink-0">
+              <ThemeToggle size="sm" />
+              <button onClick={async () => {
+                setLoggingOut(true);
+                clearToken();
+                try { await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }); } catch (e) { logger.warn("logout request failed", undefined, e); }
+                router.push("/login");
+              }}
+                disabled={loggingOut} className="btn-ghost btn-icon btn-sm text-text-tertiary hover:text-red-500" title="Sign out" aria-label="Sign out">
+                {loggingOut ? <SpinnerIcon size={16} className="animate-spin" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>}
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -173,9 +179,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
             </svg>
           </button>
-          <div className="size-7 rounded-lg bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center flex-shrink-0">
-            <span className="text-xs font-extrabold text-white">D</span>
-          </div>
+          <Logo size={28} showWordmark={false} />
           <span className="font-bold text-sm text-text-primary flex-1">Digisystem</span>
           <ThemeToggle size="sm" />
         </div>

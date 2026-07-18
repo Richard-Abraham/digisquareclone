@@ -4,14 +4,10 @@ import { api } from "@/lib/api";
 import { useWorkspace, useProjects } from "@/lib/hooks";
 import { Tabs } from "@/components/ui/Tabs";
 import { Spinner, EmptyState } from "@/components/ui/States";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Cell } from "recharts";
+import { ChartCard, LineChart, BarChart, ColoredBarChart, StatCard, chartColors, STATE_COLORS } from "@/components/charts";
 
 const GROUP_LABELS: Record<string, string> = { backlog: "Backlog", unstarted: "Todo", started: "In Progress", completed: "Done", cancelled: "Cancelled" };
-const GROUP_COLORS: Record<string, string> = { backlog: "#94A3B8", unstarted: "#6366F1", started: "#F59E0B", completed: "#10B981", cancelled: "#EF4444" };
 const TABS = [{ key: "overview", label: "Overview" }, { key: "work-items", label: "Work Items" }];
-
-const AXIS_COLOR = "#94A3B8";
-const GRID_COLOR = "rgba(148,163,184,0.15)";
 
 export default function AnalyticsPage() {
   const { data: ws } = useWorkspace();
@@ -65,67 +61,31 @@ export default function AnalyticsPage() {
 
       {tab === "overview" && overview && (
         <div className="space-y-6 animate-fade-in">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="card p-5">
-              <p className="text-3xl font-bold text-text-primary">{overview.total_projects?.toLocaleString() || 0}</p>
-              <p className="text-xs text-text-secondary mt-1 font-medium">Total Projects</p>
-            </div>
-            <div className="card p-5">
-              <p className="text-3xl font-bold text-text-primary">{overview.total_work_items?.toLocaleString() || 0}</p>
-              <p className="text-xs text-text-secondary mt-1 font-medium">Total Tasks</p>
-            </div>
-            <div className="card p-5">
-              <p className="text-3xl font-bold text-text-primary">{overview.total_members?.toLocaleString() || 0}</p>
-              <p className="text-xs text-text-secondary mt-1 font-medium">Team Members</p>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <StatCard label="Total Projects" value={overview.total_projects} />
+            <StatCard label="Total Tasks" value={overview.total_work_items} />
+            <StatCard label="Team Members" value={overview.total_members} />
           </div>
 
-          {(projectAnalytics?.monthly_trend?.length ?? 0) > 0 && (
-            <div className="card p-5">
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Monthly Created vs Completed</h3>
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart data={projectAnalytics.monthly_trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: AXIS_COLOR }} />
-                  <YAxis tick={{ fontSize: 11, fill: AXIS_COLOR }} />
-                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-card)" }} />
-                  <Line type="monotone" dataKey="created" stroke="#6366F1" strokeWidth={2.5} dot={{ r: 3 }} name="Created" />
-                  <Line type="monotone" dataKey="completed" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3 }} name="Completed" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+          {projectAnalytics?.monthly_trend?.length > 0 && (
+            <ChartCard title="Monthly Created vs Completed">
+              <LineChart data={projectAnalytics.monthly_trend} lines={[
+                { dataKey: "created", color: chartColors.primary, name: "Created" },
+                { dataKey: "completed", color: chartColors.emerald, name: "Completed" },
+              ]} height={250} />
+            </ChartCard>
           )}
 
           {projectAnalytics?.priority_distribution && (
-            <div className="card p-5">
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Priority Distribution</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={Object.entries(projectAnalytics.priority_distribution).map(([k, v]) => ({ name: k, count: v }))}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: AXIS_COLOR }} />
-                  <YAxis tick={{ fontSize: 11, fill: AXIS_COLOR }} />
-                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-card)" }} />
-                  <Bar dataKey="count" fill="#6366F1" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <ChartCard title="Priority Distribution">
+              <BarChart data={Object.entries(projectAnalytics.priority_distribution).map(([k, v]) => ({ name: k, count: v }))} xKey="name" yKey="count" color={chartColors.primary} height={200} barSize={42} />
+            </ChartCard>
           )}
 
           {projectAnalytics?.state_groups && (
-            <div className="card p-5">
-              <h3 className="text-sm font-semibold text-text-primary mb-4">State Breakdown</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={Object.entries(projectAnalytics.state_groups).map(([k, v]) => ({ name: GROUP_LABELS[k] || k, count: v, group: k }))}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: AXIS_COLOR }} />
-                  <YAxis tick={{ fontSize: 11, fill: AXIS_COLOR }} />
-                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-card)" }} />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {Object.entries(projectAnalytics.state_groups).map(([k]) => (
-                      <Cell key={k} fill={GROUP_COLORS[k] || "#6366F1"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <ChartCard title="State Breakdown">
+              <ColoredBarChart data={Object.entries(projectAnalytics.state_groups).map(([k, v]) => ({ name: GROUP_LABELS[k] || k, count: v }))} xKey="name" yKey="count" colorMap={STATE_COLORS} height={200} barSize={42} />
+            </ChartCard>
           )}
 
           {!projectAnalytics && (
@@ -139,26 +99,19 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {Object.entries(workItems).map(([k, v]) => (
               <div key={k} className="card p-4 text-center">
-                <p className="text-2xl font-extrabold" style={{ color: GROUP_COLORS[k] }}>{(v as number).toLocaleString()}</p>
+                <p className="text-2xl font-extrabold" style={{ color: STATE_COLORS[k] || chartColors.primary }}>{(v as number).toLocaleString()}</p>
                 <p className="text-xs text-text-secondary mt-1 font-medium">{GROUP_LABELS[k] || k}</p>
               </div>
             ))}
           </div>
 
-          {(projectAnalytics?.monthly_trend?.length ?? 0) > 0 && (
-            <div className="card p-5">
-              <h3 className="text-sm font-semibold text-text-primary mb-4">Created vs Resolved Over Time</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={projectAnalytics.monthly_trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: AXIS_COLOR }} />
-                  <YAxis tick={{ fontSize: 11, fill: AXIS_COLOR }} />
-                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-card)" }} />
-                  <Line type="monotone" dataKey="created" stroke="#6366F1" strokeWidth={2.5} dot={{ r: 3 }} name="Created" />
-                  <Line type="monotone" dataKey="completed" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3 }} name="Completed" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+          {projectAnalytics?.monthly_trend?.length > 0 && (
+            <ChartCard title="Created vs Resolved Over Time">
+              <LineChart data={projectAnalytics.monthly_trend} lines={[
+                { dataKey: "created", color: chartColors.primary, name: "Created" },
+                { dataKey: "completed", color: chartColors.emerald, name: "Completed" },
+              ]} height={300} />
+            </ChartCard>
           )}
         </div>
       )}

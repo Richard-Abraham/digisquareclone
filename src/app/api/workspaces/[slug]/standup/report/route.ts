@@ -7,6 +7,9 @@ import { writeActivity } from "@/lib/activity";
 import { todayKey } from "@/lib/tasks";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { parseReports, serializeReports } from "@/lib/standup";
+
+const errLocked = () => err("This standup day has ended and cannot be edited", 409);
 
 interface Completion { issue_id: string; completed: boolean }
 
@@ -19,16 +22,26 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     }
     const access = await getWorkspaceAccess(params.slug, user.id);
     if (!access) return err("Access denied", 403);
-    const { report, completions, submit } = await req.json() as { report?: string; completions?: Completion[]; submit?: boolean };
-    const date = todayKey();
+    const { report, completions, submit, date, plan_indexes, issue_ids } = await req.json() as { report?: string; completions?: Completion[]; submit?: boolean; date?: string; plan_indexes?: number[]; issue_ids?: string[] };
+    const dateKey = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : todayKey();
+    if (dateKey < todayKey()) return errLocked();
     const wsId = access.workspace.id;
     const items = completions || [];
 
-    const { data: existing } = await getAdmin().from("daily_standups").select("id, submitted_at").eq("workspace_id", wsId).eq("user_id", user.id).eq("date", date).maybeSingle();
-    if (existing?.submitted_at) return err("Report already submitted and cannot be edited", 409);
+    const { data: existing } = await getAdmin().from("daily_standups").select("id, submitted_at, report").eq("workspace_id", wsId).eq("user_id", user.id).eq("date", dateKey).maybeSingle();
 
+    const submitted_at = submit ? new Date().toISOString() : (existing?.submitted_at ?? null);
+    const reports = parseReports(existing?.report);
+    if (report?.trim()) {
+      reports.push({
+        text: report.trim(),
+        created_at: new Date().toISOString(),
+        plan_indexes: Array.isArray(plan_indexes) ? plan_indexes.filter((n) => Number.isInteger(n) && n >= 0) : [],
+        issue_ids: Array.isArray(issue_ids) ? issue_ids.filter((s) => typeof s === "string") : [],
+      });
+    }
     const { data: standup, error: e } = await getAdmin().from("daily_standups")
-      .upsert({ workspace_id: wsId, user_id: user.id, date, report: report ?? null, submitted_at: submit ? new Date().toISOString() : null, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,user_id,date" })
+      .upsert({ workspace_id: wsId, user_id: user.id, date: dateKey, report: serializeReports(reports), submitted_at, updated_at: new Date().toISOString() }, { onConflict: "workspace_id,user_id,date" })
       .select().single();
     if (e) return err(e.message, 400);
 
@@ -37,9 +50,14 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       await getAdmin().from("standup_report_tasks").insert(items.map((c, i) => ({ standup_id: standup.id, issue_id: c.issue_id, completed: c.completed, order_index: i })));
 
       // Batch-sync completed issues to the board (was N+1).
-      const completedIds = items.filter((c) => c.completed).map((c) => c.issue_id);
-      if (completedIds.length) {
-        const { data: issues } = await getAdmin().from("issues").select("id, project_id").in("id", completedIds);
+      // Only touch issues not already completed, so repeated saves don't
+      // re-update them or write duplicate "completed" activity events.
+      const checkedIds = items.filter((c) => c.completed).map((c) => c.issue_id);
+      if (checkedIds.length) {
+        const { data: allIssues } = await getAdmin().from("issues").select("id, project_id, completed_at").in("id", checkedIds);
+        const issues = (allIssues || []).filter((i: any) => !i.completed_at);
+        const completedIds = issues.map((i: any) => i.id);
+        if (!completedIds.length) return ok({ ok: true, submitted: !!submit });
         const projectIds = Array.from(new Set((issues || []).map((i: any) => i.project_id)));
         const stateMap = new Map<string, string | null>();
         for (const pid of projectIds) stateMap.set(pid, await getCompletedState(pid));

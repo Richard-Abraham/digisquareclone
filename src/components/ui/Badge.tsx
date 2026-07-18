@@ -1,4 +1,4 @@
-import { cn } from "@/lib/cn";
+import clsx from "clsx";
 
 type Variant = "primary" | "success" | "warning" | "danger" | "neutral";
 
@@ -15,5 +15,5 @@ const variantClass: Record<Variant, string> = {
 };
 
 export function Badge({ variant = "neutral", className, ...props }: BadgeProps) {
-  return <span className={cn(variantClass[variant], className)} {...props} />;
+  return <span className={clsx(variantClass[variant], className)} {...props} />;
 }

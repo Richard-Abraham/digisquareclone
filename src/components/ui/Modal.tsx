@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { cn } from "@/lib/cn";
+import clsx from "clsx";
 import { CloseIcon } from "@/components/icons";
 
 interface ModalProps {
@@ -36,7 +36,7 @@ export function Modal({ open, onClose, title, description, children, footer, max
       aria-label={title}
     >
       <div
-        className={cn(
+        className={clsx(
           "relative bg-surface-card rounded-t-2xl sm:rounded-2xl shadow-modal w-full animate-slide-up p-5 sm:p-6 max-h-[90vh] overflow-y-auto",
           maxWidth
         )}

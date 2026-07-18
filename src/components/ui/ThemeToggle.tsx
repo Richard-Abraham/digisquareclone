@@ -1,7 +1,7 @@
 "use client";
 import { useTheme } from "@/lib/theme";
 import { SunIcon, MoonIcon } from "@/components/icons";
-import { cn } from "@/lib/cn";
+import clsx from "clsx";
 
 interface ThemeToggleProps {
   className?: string;
@@ -14,7 +14,7 @@ export function ThemeToggle({ className, size = "md" }: ThemeToggleProps) {
   return (
     <button
       onClick={toggle}
-      className={cn("btn-ghost btn-icon", size === "sm" ? "btn-sm" : "", className)}
+      className={clsx("btn-ghost btn-icon", size === "sm" ? "btn-sm" : "", className)}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       title={isDark ? "Light mode" : "Dark mode"}
     >

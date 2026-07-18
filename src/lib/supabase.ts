@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { env } from "./env";
 
 let _admin: SupabaseClient | null = null;
+let _anon: SupabaseClient | null = null;
 
 export function getAdmin(): SupabaseClient {
   if (_admin) return _admin;
@@ -9,4 +10,11 @@ export function getAdmin(): SupabaseClient {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   return _admin;
+}
+
+export function getAnon(): SupabaseClient {
+  if (_anon) return _anon;
+  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY must be set");
+  _anon = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  return _anon;
 }
