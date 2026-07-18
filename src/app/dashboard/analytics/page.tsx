@@ -41,12 +41,23 @@ export default function AnalyticsPage() {
 
   if (loading) return <Spinner label="Loading analytics..." />;
 
+  const totalTasks = overview?.total_work_items || 0;
+  const completedTasks = workItems?.completed || 0;
+  const inProgressTasks = workItems?.started || 0;
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const activeRate = totalTasks > 0 ? Math.round((inProgressTasks / totalTasks) * 100) : 0;
+
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
       <div className="section-header flex-wrap gap-3">
-        <div>
-          <h1 className="section-title">Analytics</h1>
-          <p className="section-desc">Track progress, trends, and team activity</p>
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex size-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 shadow-sm items-center justify-center flex-shrink-0 text-white">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>
+          </div>
+          <div>
+            <h1 className="section-title">Analytics</h1>
+            <p className="section-desc">Track progress, trends, and team activity</p>
+          </div>
         </div>
         <div className="flex gap-2 flex-wrap">
           {projects && projects.length > 0 && (
@@ -61,12 +72,43 @@ export default function AnalyticsPage() {
 
       {tab === "overview" && overview && (
         <div className="space-y-6 animate-fade-in">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <StatCard label="Total Projects" value={overview.total_projects} />
-            <StatCard label="Total Tasks" value={overview.total_work_items} />
-            <StatCard label="Team Members" value={overview.total_members} />
+          {/* Overview stats */}
+          <div>
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-2.5">Overview</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <StatCard label="Total Projects" value={overview.total_projects} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>} />
+              <StatCard label="Total Tasks" value={totalTasks} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>} />
+              <StatCard label="Team Members" value={overview.total_members} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>} />
+              <StatCard label="Completion" value={`${completionRate}%`} sub={`${completedTasks} done`} color={chartColors.emerald} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>} />
+            </div>
           </div>
 
+          {/* Workspace health bar */}
+          {totalTasks > 0 && (
+            <div className="card p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-bold text-text-primary">Workspace Health</span>
+                <span className={`text-xs font-bold ${completionRate >= 70 ? "text-emerald-600" : completionRate >= 40 ? "text-amber-500" : "text-red-500"}`}>
+                  {completionRate >= 70 ? "Healthy" : completionRate >= 40 ? "On Track" : "Needs Attention"}
+                </span>
+              </div>
+              <div className="flex h-3 rounded-full overflow-hidden bg-surface-2">
+                {Object.entries(workItems || {}).map(([k, v]) => (
+                  <div key={k} style={{ width: `${((v as number) / totalTasks) * 100}%`, backgroundColor: STATE_COLORS[k] || chartColors.slate }} title={`${GROUP_LABELS[k] || k}: ${v}`} />
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-3 mt-3">
+                {Object.entries(workItems || {}).map(([k, v]) => (
+                  <span key={k} className="flex items-center gap-1.5 text-[10px] text-text-secondary">
+                    <span className="size-2.5 rounded-full" style={{ backgroundColor: STATE_COLORS[k] || chartColors.slate }} />
+                    {GROUP_LABELS[k] || k} ({(v as number).toLocaleString()})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Charts */}
           {projectAnalytics?.monthly_trend?.length > 0 && (
             <ChartCard title="Monthly Created vs Completed">
               <LineChart data={projectAnalytics.monthly_trend} lines={[
@@ -76,17 +118,18 @@ export default function AnalyticsPage() {
             </ChartCard>
           )}
 
-          {projectAnalytics?.priority_distribution && (
-            <ChartCard title="Priority Distribution">
-              <BarChart data={Object.entries(projectAnalytics.priority_distribution).map(([k, v]) => ({ name: k, count: v }))} xKey="name" yKey="count" color={chartColors.primary} height={200} barSize={42} />
-            </ChartCard>
-          )}
-
-          {projectAnalytics?.state_groups && (
-            <ChartCard title="State Breakdown">
-              <ColoredBarChart data={Object.entries(projectAnalytics.state_groups).map(([k, v]) => ({ name: GROUP_LABELS[k] || k, count: v }))} xKey="name" yKey="count" colorMap={STATE_COLORS} height={200} barSize={42} />
-            </ChartCard>
-          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {projectAnalytics?.priority_distribution && (
+              <ChartCard title="Priority Distribution">
+                <BarChart data={Object.entries(projectAnalytics.priority_distribution).map(([k, v]) => ({ name: k, count: v }))} xKey="name" yKey="count" color={chartColors.primary} height={200} barSize={42} />
+              </ChartCard>
+            )}
+            {projectAnalytics?.state_groups && (
+              <ChartCard title="State Breakdown">
+                <ColoredBarChart data={Object.entries(projectAnalytics.state_groups).map(([k, v]) => ({ name: GROUP_LABELS[k] || k, count: v }))} xKey="name" yKey="count" colorMap={STATE_COLORS} height={200} barSize={42} />
+              </ChartCard>
+            )}
+          </div>
 
           {!projectAnalytics && (
             <EmptyState title="No analytics available" description="Select a project to view detailed analytics." />
@@ -96,14 +139,32 @@ export default function AnalyticsPage() {
 
       {tab === "work-items" && workItems && (
         <div className="space-y-6 animate-fade-in">
+          {/* State cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {Object.entries(workItems).map(([k, v]) => (
-              <div key={k} className="card p-4 text-center">
-                <p className="text-2xl font-extrabold" style={{ color: STATE_COLORS[k] || chartColors.primary }}>{(v as number).toLocaleString()}</p>
+              <div key={k} className="card p-4 text-center transition-all hover:shadow-card hover:-translate-y-0.5 cursor-default">
+                <div className="size-8 rounded-lg mx-auto mb-2 flex items-center justify-center" style={{ backgroundColor: `${STATE_COLORS[k] || chartColors.primary}15` }}>
+                  <span className="size-2.5 rounded-full" style={{ backgroundColor: STATE_COLORS[k] || chartColors.primary }} />
+                </div>
+                <p className="text-2xl font-extrabold font-display" style={{ color: STATE_COLORS[k] || chartColors.primary }}>{(v as number).toLocaleString()}</p>
                 <p className="text-xs text-text-secondary mt-1 font-medium">{GROUP_LABELS[k] || k}</p>
               </div>
             ))}
           </div>
+
+          {/* Active rate progress bar */}
+          {totalTasks > 0 && (
+            <div className="card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-text-primary">Active Rate</span>
+                <span className="text-sm font-bold text-amber-500">{activeRate}%</span>
+              </div>
+              <div className="h-2.5 rounded-full bg-surface-2 overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500" style={{ width: `${activeRate}%` }} />
+              </div>
+              <p className="text-[10px] text-text-tertiary mt-2">{inProgressTasks} in progress out of {totalTasks} total tasks</p>
+            </div>
+          )}
 
           {projectAnalytics?.monthly_trend?.length > 0 && (
             <ChartCard title="Created vs Resolved Over Time">
