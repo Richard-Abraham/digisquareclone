@@ -39,13 +39,26 @@ export const STATE_COLORS: Record<string, string> = {
 
 export const tooltipStyle = {
   borderRadius: 10,
-  border: "1px solid #E2E8F0",
+  border: "1px solid var(--tooltip-border, #E2E8F0)",
   fontSize: 12,
-  boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
-  background: "rgba(255,255,255,0.95)",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+  background: "var(--tooltip-bg, rgba(255,255,255,0.96))",
+  color: "var(--tooltip-text, #15 23 42)",
 };
 
 export const axisTick = { fontSize: 11, fill: "#94A3B8" };
+
+if (typeof document !== "undefined") {
+  const updateChartTheme = () => {
+    const isDark = document.documentElement.classList.contains("dark");
+    document.documentElement.style.setProperty("--tooltip-bg", isDark ? "rgba(23,32,51,0.96)" : "rgba(255,255,255,0.96)");
+    document.documentElement.style.setProperty("--tooltip-border", isDark ? "#1E293B" : "#E2E8F0");
+    document.documentElement.style.setProperty("--tooltip-text", isDark ? "#F1F5F9" : "#0F172A");
+  };
+  updateChartTheme();
+  const observer = new MutationObserver(updateChartTheme);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+}
 
 export function ChartCard({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
   return (
@@ -149,18 +162,34 @@ export function DonutChart({ data, dataKey, nameKey, colors, height = 260, inner
   );
 }
 
-export function StatCard({ label, value, sub, icon, color }: { label: string; value: string | number; sub?: string; icon?: React.ReactNode; color?: string }) {
+export function StatCard({ label, value, sub, icon, color, trend, onClick }: { label: string; value: string | number; sub?: string; icon?: React.ReactNode; color?: string; trend?: { value: number; label?: string }; onClick?: () => void }) {
   return (
-    <div className="card p-5">
+    <div
+      className={`card p-5 ${onClick ? "cursor-pointer hover:shadow-elevated hover:border-border-accent transition-all" : ""}`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined}
+    >
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-text-secondary">{label}</span>
         {icon && (
-          <span className="grid size-9 place-items-center rounded-lg bg-primary-50 text-primary" style={color ? { background: `${color}15`, color } : undefined}>
+          <span className="grid size-9 place-items-center rounded-lg bg-primary-50 text-primary transition-transform duration-200" style={color ? { background: `${color}15`, color } : undefined}>
             {icon}
           </span>
         )}
       </div>
-      <p className="mt-3 text-3xl font-bold text-text-primary">{typeof value === "number" ? value.toLocaleString() : value}</p>
+      <div className="flex items-baseline gap-2 mt-3">
+        <p className="text-3xl font-bold text-text-primary font-display tracking-tight">{typeof value === "number" ? value.toLocaleString() : value}</p>
+        {trend && (
+          <span className={`text-xs font-bold flex items-center gap-0.5 ${trend.value >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: trend.value >= 0 ? "none" : "rotate(180deg)" }}>
+              <path d="M7 17l5-5 5 5" /><path d="M7 11l5-5 5 5" />
+            </svg>
+            {Math.abs(trend.value)}%
+          </span>
+        )}
+      </div>
       {sub && <p className="mt-0.5 text-xs text-text-tertiary">{sub}</p>}
     </div>
   );
