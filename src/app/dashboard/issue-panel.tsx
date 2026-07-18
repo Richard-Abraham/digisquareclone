@@ -8,8 +8,12 @@ import { IssueDetailCore } from "@/components/issue/IssueDetailCore";
 interface Member { user_id: string; profile: { display_name: string } | null; }
 interface State { id: string; name: string; group_name: string; color: string; }
 interface ActivityEvent { id: string; kind: string; created_at: string; snippet: string | null; actor: { display_name?: string } | null; metadata: any; }
+interface SubTask { id: string; title: string; done: boolean; }
+interface Comment { id: string; body: string; kind: string; created_at: string; author: { display_name?: string } | null; author_id: string; }
+interface Reviewer { user_id: string; state: string; profile: { display_name?: string } | null; }
+interface Tag { id: string; name: string; kind: string; }
 
-interface Issue { id: string; name: string; priority: string; sequence_id: number; state_id: string; is_bug: boolean; target_date: string | null; created_at: string; created_by: string; creator: { display_name?: string } | null; assignees?: { user_id?: string; display_name?: string }[]; state: State | null; }
+interface Issue { id: string; name: string; description_html?: string; priority: string; sequence_id: number; state_id: string; is_bug: boolean; target_date: string | null; created_at: string; created_by: string; creator: { display_name?: string } | null; assignees?: { user_id?: string; display_name?: string }[]; state: State | null; tag_ids?: string[]; }
 
 interface IssuePanelProps {
   issueId: string;
@@ -26,15 +30,25 @@ export default function IssuePanel({ issueId, wsSlug, projId, states, onClose, o
   const [issue, setIssue] = useState<Issue | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [subtasks, setSubtasks] = useState<SubTask[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [reviewers, setReviewers] = useState<Reviewer[]>([]);
+  const [me, setMe] = useState<{ id: string } | null>(null);
   const [bundleLoading, setBundleLoading] = useState(true);
 
   useEffect(() => {
     async function loadBundle() {
       try {
-        const b = await api<{ issue: Issue; members: Member[]; activity: ActivityEvent[] }>(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${issueId}/detail`);
+        const b = await api<{ issue: Issue; members: Member[]; activity: ActivityEvent[]; subtasks: SubTask[]; tags: Tag[]; comments: Comment[]; reviewers: Reviewer[]; me: { id: string } }>(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${issueId}/detail`);
         setIssue(b.issue);
         setMembers(b.members);
         setActivity(b.activity);
+        setSubtasks(b.subtasks || []);
+        setTags(b.tags || []);
+        setComments(b.comments || []);
+        setReviewers(b.reviewers || []);
+        setMe(b.me || null);
       } catch {} finally { setBundleLoading(false); }
     }
     loadBundle();
@@ -92,6 +106,11 @@ export default function IssuePanel({ issueId, wsSlug, projId, states, onClose, o
               issue={issue}
               members={members}
               activity={activity}
+              subtasks={subtasks}
+              tags={tags}
+              comments={comments}
+              reviewers={reviewers}
+              me={me || undefined}
               onIssueUpdated={(updated) => {
                 setIssue(updated as Issue);
                 onIssueUpdated?.(updated as Issue);
