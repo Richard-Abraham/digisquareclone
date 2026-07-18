@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     const access = await getWorkspaceAccess(params.slug, user.id);
     if (!access) return err("Access denied", 403);
     const wsId = access.workspace.id;
-    const { data } = await getAdmin().from("projects").select("*").eq("workspace_id", wsId).order("created_at", { ascending: false });
+    const { data } = await getAdmin().from("projects").select("*").eq("workspace_id", wsId).order("name", { ascending: true });
     let visibleProjects = data || [];
     if (!access.isManager) {
       const { data: myProjects } = await getAdmin().from("project_members").select("project_id").eq("user_id", user.id);

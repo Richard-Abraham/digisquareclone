@@ -28,7 +28,7 @@ const SHORTCUTS: Record<string, string> = {
 interface NavItem { href: string; icon: React.ReactNode; label: string; pattern: (p: string) => boolean; badge?: number }
 interface NavGroup { label: string; items: NavItem[] }
 
-interface NotifItem { id: string; kind: string; created_at: string; read: boolean; issue?: { id: string; name: string } | null; workspace?: { slug: string } | null }
+interface NotifItem { id: string; kind: string; read_at: string | null; created_at: string; issue_id: string; project_id: string | null; issue_name: string; workspace_slug: string | null; actor_name: string }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, ready } = useAuth();
@@ -201,11 +201,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 </div>
                               ) : notifs.length > 0 ? (
                                 notifs.map((n) => {
-                                  const isUnread = !n.read;
+                                  const isUnread = !n.read_at;
                                   return (
                                     <Link
                                       key={n.id}
-                                      href={n.issue && n.workspace ? `/dashboard/issues/${n.issue.id}?ws=${n.workspace.slug}` : "/dashboard/notifications"}
+                                      href={n.workspace_slug ? `/dashboard/issues/${n.issue_id}?ws=${n.workspace_slug}&proj=${n.project_id ?? ""}` : "/dashboard/notifications"}
                                       onClick={() => setNotifOpen(false)}
                                       className={`flex items-start gap-2.5 px-4 py-3 border-b border-border-subtle last:border-0 hover:bg-surface-2 transition-colors ${isUnread ? "bg-primary-50/40 dark:bg-primary-500/5" : ""}`}
                                     >
@@ -213,7 +213,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                         <BellIcon size={13} />
                                       </div>
                                       <div className="min-w-0 flex-1">
-                                        <p className="text-sm text-text-primary truncate leading-snug">{n.issue?.name || n.kind.replace(/_/g, " ")}</p>
+                                        <p className="text-sm text-text-primary truncate leading-snug">{n.issue_name || n.kind.replace(/_/g, " ")}</p>
                                         <p className="text-[10px] text-text-tertiary mt-0.5">{new Date(n.created_at).toLocaleString()}</p>
                                       </div>
                                     </Link>

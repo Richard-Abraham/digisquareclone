@@ -110,7 +110,7 @@ export default function IssuesPage() {
     setCreatingProj(true);
     try {
       const p = await api<{ id: string }>(`/api/workspaces/${wsSlug}/projects`, { method: "POST", body: { name: newProjName } });
-      setProjects(prev => [p as any, ...prev]); setShowProj(false); setNewProjName(""); selectProject(p.id);
+      setProjects(prev => [...prev, p as any].sort((a, b) => (a as any).name.localeCompare((b as any).name))); setShowProj(false); setNewProjName(""); selectProject(p.id);
     } finally { setCreatingProj(false); }
   }
 
