@@ -113,6 +113,12 @@ export default function ProfilePage() {
   const initials = (name?.[0] || user.email?.[0] || "U").toUpperCase();
   const roleLabel = isManager ? "Manager" : "Member";
 
+  const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
+    profile: { label: "Profile", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg> },
+    preferences: { label: "Preferences", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg> },
+    workspace: { label: "Workspace", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg> },
+  };
+
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto">
       <div className="section-header">
@@ -127,13 +133,15 @@ export default function ProfilePage() {
         <div className="space-y-4">
           {/* Profile card */}
           <div className="card p-5 text-center">
-            <div className="avatar-lg mx-auto bg-gradient-to-br from-primary-300 to-primary-600 text-white text-xl font-bold shadow-md shadow-primary-200/50 dark:shadow-primary-900/30 mb-3">
+            <div className="avatar-lg mx-auto bg-gradient-to-br from-primary-300 to-primary-600 text-white text-xl font-bold shadow-md shadow-primary-200/50 dark:shadow-primary-900/30 mb-3 ring-4 ring-surface-1">
               {initials}
             </div>
             <p className="text-sm font-semibold text-text-primary truncate">{name || "Set your name"}</p>
             <p className="text-xs text-text-tertiary truncate mt-0.5">{user.email}</p>
             {workspace && (
-              <span className="badge badge-neutral mt-2 text-[10px]">{roleLabel}</span>
+              <span className={`badge mt-2 text-[10px] ${isManager ? "badge-primary" : "badge-neutral"}`}>
+                {isManager ? "Manager" : "Member"}
+              </span>
             )}
           </div>
 
@@ -141,9 +149,10 @@ export default function ProfilePage() {
           <nav className="card p-2 space-y-0.5">
             {(["profile", "preferences", "workspace"] as Tab[]).map((t) => (
               <button key={t} onClick={() => setTab(t)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors capitalize
-                  ${tab === t ? "bg-primary-50 text-primary" : "text-text-secondary hover:bg-surface-2"}`}>
-                {t}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2
+                  ${tab === t ? "bg-primary-50 text-primary dark:bg-primary-500/10" : "text-text-secondary hover:bg-surface-2 hover:text-text-primary"}`}>
+                <span className="flex-shrink-0">{TAB_META[t].icon}</span>
+                {TAB_META[t].label}
               </button>
             ))}
           </nav>
@@ -269,11 +278,16 @@ export default function ProfilePage() {
               ) : workspace ? (
                 <>
                   <div className="flex items-center justify-between py-3 border-b border-border-subtle">
-                    <div>
-                      <p className="text-sm font-medium text-text-primary">{workspace.name}</p>
-                      <p className="text-xs text-text-tertiary mt-0.5">/{workspace.slug}</p>
+                    <div className="flex items-center gap-2.5">
+                      <div className="size-9 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                        {workspace.name[0]?.toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-text-primary">{workspace.name}</p>
+                        <p className="text-xs text-text-tertiary mt-0.5">/{workspace.slug}</p>
+                      </div>
                     </div>
-                    <span className="badge badge-neutral text-[10px]">{isManager ? "Manager" : "Member"}</span>
+                    <span className={`badge text-[10px] ${isManager ? "badge-primary" : "badge-neutral"}`}>{isManager ? "Manager" : "Member"}</span>
                   </div>
                   <div className="flex items-center justify-between py-3 border-b border-border-subtle">
                     <p className="text-sm text-text-secondary">Members</p>
@@ -284,11 +298,12 @@ export default function ProfilePage() {
                     <div className="space-y-1.5 max-h-48 overflow-y-auto">
                       {members.map((m) => (
                         <div key={m.user_id} className="flex items-center gap-2.5 py-1">
-                          <div className="avatar-sm bg-primary-100 text-primary-700 text-[10px] font-bold">
+                          <div className="avatar-sm bg-primary-100 text-primary-700 text-[10px] font-bold dark:bg-primary-500/20 dark:text-primary-300">
                             {(m.profile?.display_name?.[0] || "U").toUpperCase()}
                           </div>
                           <span className="text-sm text-text-primary truncate">{m.profile?.display_name || "Unknown"}</span>
-                          {m.is_owner && <span className="badge badge-neutral text-[9px]">Owner</span>}
+                          {m.is_owner && <span className="badge badge-warning text-[9px]">Owner</span>}
+                          {!m.is_owner && m.role === 2 && <span className="badge badge-primary text-[9px]">Manager</span>}
                         </div>
                       ))}
                     </div>
