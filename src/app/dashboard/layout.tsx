@@ -16,6 +16,14 @@ import {
   TasksIcon, UserIcon, CalendarIcon, BellIcon, UsersIcon, ChartIcon, FolderIcon,
 } from "@/components/icons";
 
+const SHORTCUTS: Record<string, string> = {
+  Board: "N",
+  Projects: "P",
+  Members: "M",
+  Analytics: "A",
+  Standup: "S",
+};
+
 interface NavItem { href: string; icon: React.ReactNode; label: string; pattern: (p: string) => boolean; badge?: number }
 interface NavGroup { label: string; items: NavItem[] }
 
@@ -24,6 +32,7 @@ interface NotifItem { id: string; kind: string; created_at: string; read: boolea
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, ready } = useAuth();
   const [unread, setUnread] = useState(0);
+  const [workspaceName, setWorkspaceName] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -74,6 +83,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { data: unreadCount } = useUnreadCount(!!user);
   useEffect(() => { if (unreadCount !== undefined) setUnread(unreadCount); }, [unreadCount]);
 
+  useEffect(() => {
+    if (!user) return;
+    api<{ name: string }[]>("/api/workspaces").then(ws => { if (ws.length > 0) setWorkspaceName(ws[0].name); }).catch(() => {});
+  }, [user]);
+
   if (!user || !ready) return (
     <div className="flex h-screen items-center justify-center bg-surface">
       <div className="flex flex-col items-center gap-3">
@@ -123,14 +137,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         lg:static lg:translate-x-0
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
-        {/* Logo */}
-        <div className="flex items-center gap-2 px-5 h-16 border-b border-border-subtle flex-shrink-0">
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden btn-ghost btn-icon btn-sm -ml-2 mr-1" aria-label="Close sidebar">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
-          <Logo size={34} wordmarkClassName="text-[17px]" />
+        {/* Logo + workspace */}
+        <div className="flex-shrink-0">
+          <div className="flex items-center gap-2 px-5 h-16 border-b border-border-subtle">
+            <button onClick={() => setSidebarOpen(false)} className="lg:hidden btn-ghost btn-icon btn-sm -ml-2 mr-1" aria-label="Close sidebar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+            <Logo size={34} wordmarkClassName="text-[17px]" />
+          </div>
+          {workspaceName && (
+            <div className="px-5 py-2.5 border-b border-border-subtle bg-surface-2/30">
+              <div className="flex items-center gap-2">
+                <div className="size-6 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+                  {workspaceName[0]?.toUpperCase()}
+                </div>
+                <span className="text-xs font-semibold text-text-secondary truncate">{workspaceName}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Nav */}
@@ -166,7 +192,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           <div className="absolute left-full top-0 ml-2 w-80 bg-surface-1 rounded-xl border border-border shadow-elevated z-50 overflow-hidden animate-slide-in-right">
                             <div className="px-4 py-3 border-b border-border-subtle flex items-center justify-between">
                               <span className="text-sm font-bold text-text-primary">Notifications</span>
-                              {unread > 0 && <span className="text-[10px] text-text-tertiary">{unread} unread</span>}
+                              {unread > 0 && <span className="badge badge-primary text-[9px]">{unread} unread</span>}
                             </div>
                             <div className="max-h-80 overflow-y-auto">
                               {notifLoading ? (
@@ -174,28 +200,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                   <SpinnerIcon size={20} className="animate-spin text-primary" />
                                 </div>
                               ) : notifs.length > 0 ? (
-                                notifs.map((n) => (
-                                  <Link
-                                    key={n.id}
-                                    href={n.issue && n.workspace ? `/dashboard/issues/${n.issue.id}?ws=${n.workspace.slug}` : "/dashboard/notifications"}
-                                    onClick={() => setNotifOpen(false)}
-                                    className={`block px-4 py-3 border-b border-border-subtle last:border-0 hover:bg-surface-2 transition-colors ${!n.read ? "bg-primary-50/40" : ""}`}
-                                  >
-                                    <div className="flex items-start gap-2">
-                                      {!n.read && <span className="size-2 rounded-full bg-primary flex-shrink-0 mt-1.5" />}
+                                notifs.map((n) => {
+                                  const isUnread = !n.read;
+                                  return (
+                                    <Link
+                                      key={n.id}
+                                      href={n.issue && n.workspace ? `/dashboard/issues/${n.issue.id}?ws=${n.workspace.slug}` : "/dashboard/notifications"}
+                                      onClick={() => setNotifOpen(false)}
+                                      className={`flex items-start gap-2.5 px-4 py-3 border-b border-border-subtle last:border-0 hover:bg-surface-2 transition-colors ${isUnread ? "bg-primary-50/40 dark:bg-primary-500/5" : ""}`}
+                                    >
+                                      <div className={`size-7 rounded-lg flex items-center justify-center flex-shrink-0 ${isUnread ? "bg-primary-100 text-primary dark:bg-primary-500/15" : "bg-surface-2 text-text-tertiary"}`}>
+                                        <BellIcon size={13} />
+                                      </div>
                                       <div className="min-w-0 flex-1">
-                                        <p className="text-sm text-text-primary truncate">{n.issue?.name || n.kind.replace(/_/g, " ")}</p>
+                                        <p className="text-sm text-text-primary truncate leading-snug">{n.issue?.name || n.kind.replace(/_/g, " ")}</p>
                                         <p className="text-[10px] text-text-tertiary mt-0.5">{new Date(n.created_at).toLocaleString()}</p>
                                       </div>
-                                    </div>
-                                  </Link>
-                                ))
+                                    </Link>
+                                  );
+                                })
                               ) : (
-                                <p className="text-sm text-text-tertiary text-center py-8">No notifications</p>
+                                <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                                  <div className="size-10 rounded-xl bg-surface-2 flex items-center justify-center text-text-tertiary mb-2">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
+                                  </div>
+                                  <p className="text-xs font-medium text-text-secondary">All caught up!</p>
+                                  <p className="text-[10px] text-text-tertiary mt-0.5">No new notifications</p>
+                                </div>
                               )}
                             </div>
                             <Link href="/dashboard/notifications" onClick={() => setNotifOpen(false)}
-                              className="block text-center py-2.5 text-xs font-medium text-primary hover:bg-primary-50 transition-colors border-t border-border-subtle">
+                              className="block text-center py-2.5 text-xs font-medium text-primary hover:bg-primary-50 dark:hover:bg-primary-500/10 transition-colors border-t border-border-subtle">
                               View all notifications
                             </Link>
                           </div>
@@ -203,6 +238,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       </div>
                     );
                   }
+                  const shortcut = SHORTCUTS[item.label];
                   return (
                     <Link key={item.href} href={item.href}
                       className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
@@ -217,6 +253,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         {item.icon}
                       </span>
                       <span className="flex-1">{item.label}</span>
+                      {shortcut && !active && (
+                        <kbd className="hidden lg:inline-flex items-center justify-center size-5 rounded text-[9px] font-bold bg-surface-2 text-text-tertiary border border-border-subtle opacity-0 group-hover:opacity-100 transition-opacity">{shortcut}</kbd>
+                      )}
                       {item.badge !== undefined && item.badge > 0 && (
                         <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm animate-pulse-soft">
                           {item.badge > 99 ? "99+" : item.badge}
@@ -232,29 +271,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* User footer */}
         <div className="border-t border-border-subtle p-3 flex-shrink-0">
-          <div className="flex items-center gap-3 rounded-xl px-2.5 py-2.5 bg-surface-2/60 border border-border-subtle transition-colors hover:bg-surface-2">
-            <div className="avatar-md bg-gradient-to-br from-primary-400 to-primary-600 text-white shadow-sm ring-2 ring-surface-1">
-              {profile?.display_name?.[0]?.toUpperCase() || "U"}
-            </div>
-            <div className="flex-1 min-w-0">
-              <Link href="/dashboard/profile" className="hover:opacity-80 transition-opacity block">
-                <p className="text-sm font-semibold text-text-primary truncate">{profile?.display_name || user.email}</p>
+          <Link href="/dashboard/profile" className="block">
+            <div className="flex items-center gap-3 rounded-xl px-2.5 py-2.5 bg-surface-2/60 border border-border-subtle transition-all hover:bg-surface-2 hover:border-border-accent group">
+              <div className="relative flex-shrink-0">
+                <div className="avatar-md bg-gradient-to-br from-primary-400 to-primary-600 text-white shadow-sm ring-2 ring-surface-1">
+                  {profile?.display_name?.[0]?.toUpperCase() || "U"}
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full bg-emerald-500 ring-2 ring-surface-1" aria-label="Online" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-text-primary truncate group-hover:text-primary transition-colors">{profile?.display_name || user.email}</p>
                 <p className="text-[11px] text-text-tertiary truncate">{user.email}</p>
-              </Link>
+              </div>
+              <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <ThemeToggle size="sm" />
+                <button onClick={async (e) => {
+                  e.preventDefault();
+                  setLoggingOut(true);
+                  clearToken();
+                  try { await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }); } catch (e) { logger.warn("logout request failed", undefined, e); }
+                  router.push("/login");
+                }}
+                  disabled={loggingOut} className="btn-ghost btn-icon btn-sm text-text-tertiary hover:text-red-500" title="Sign out" aria-label="Sign out">
+                  {loggingOut ? <SpinnerIcon size={16} className="animate-spin" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>}
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-0.5 shrink-0">
-              <ThemeToggle size="sm" />
-              <button onClick={async () => {
-                setLoggingOut(true);
-                clearToken();
-                try { await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }); } catch (e) { logger.warn("logout request failed", undefined, e); }
-                router.push("/login");
-              }}
-                disabled={loggingOut} className="btn-ghost btn-icon btn-sm text-text-tertiary hover:text-red-500" title="Sign out" aria-label="Sign out">
-                {loggingOut ? <SpinnerIcon size={16} className="animate-spin" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>}
-              </button>
-            </div>
-          </div>
+          </Link>
         </div>
       </aside>
 
