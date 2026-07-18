@@ -76,21 +76,44 @@ export default function MembersPage() {
     await load();
   }
 
+  const [search, setSearch] = useState("");
+
   if (loading) return <Spinner label="Loading members..." />;
 
   const existingManagerIds = new Set(standupManagers.map((m) => m.user_id));
   const managerCandidates = members.filter((m) => !m.is_owner && !existingManagerIds.has(m.user_id));
+  const filteredMembers = search.trim()
+    ? members.filter(m => (m.profile?.display_name || "").toLowerCase().includes(search.toLowerCase()) || m.user_id.slice(0, 8).includes(search))
+    : members;
+
+  const ROLE_COLORS: Record<number, string> = { 0: "badge-neutral", 1: "badge-primary", 2: "badge-warning" };
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto">
       <div className="section-header">
-        <div>
-          <h1 className="section-title">Members</h1>
-          <p className="section-desc">{members.length} {members.length === 1 ? "person" : "people"} in this workspace</p>
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex size-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 shadow-sm items-center justify-center flex-shrink-0 text-white">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+          </div>
+          <div>
+            <h1 className="section-title">Members</h1>
+            <p className="section-desc">{members.length} {members.length === 1 ? "person" : "people"} in this workspace</p>
+          </div>
         </div>
       </div>
 
       {msg && <div className="rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 px-3 py-2 text-sm text-red-600 dark:text-red-400 mb-4 animate-fade-in">{msg}</div>}
+
+      {/* Search bar */}
+      {members.length > 3 && (
+        <div className="relative mb-5">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search members..."
+            className="input !pl-9 rounded-lg" aria-label="Search members" />
+        </div>
+      )}
 
       {isManager && (
         <div className="card p-5 mb-5 animate-slide-up">
@@ -114,11 +137,11 @@ export default function MembersPage() {
 
       <div className="card overflow-hidden mb-5">
         <div className="divide-y divide-border-subtle">
-          {members.length === 0 ? (
-            <EmptyState title="No members" description="Members will appear here once they join the workspace." />
-          ) : members.map((m) => (
+          {filteredMembers.length === 0 ? (
+            <EmptyState title={search.trim() ? "No matches" : "No members"} description={search.trim() ? "Try a different search term." : "Members will appear here once they join the workspace."} />
+          ) : filteredMembers.map((m) => (
             <div key={m.user_id} className="list-item hover:bg-surface-muted flex-wrap gap-2">
-              <div className="avatar-md bg-gradient-to-br from-primary-200 to-primary-400 text-white font-bold shadow-sm flex-shrink-0">
+              <div className="avatar-md bg-gradient-to-br from-primary-200 to-primary-400 text-white font-bold shadow-sm flex-shrink-0 ring-2 ring-surface-card">
                 {m.profile?.display_name?.[0]?.toUpperCase() || "U"}
               </div>
               <div className="flex-1 min-w-0">
@@ -137,7 +160,7 @@ export default function MembersPage() {
                   <button onClick={() => setRemoveTarget({ uid: m.user_id, name: m.profile?.display_name || "this member" })} className="btn-ghost btn-sm text-text-tertiary hover:text-red-500">Remove</button>
                 </div>
               ) : (
-                <span className="badge-neutral flex-shrink-0">{roleLabel(m.role)}</span>
+                <span className={`${ROLE_COLORS[m.role] || "badge-neutral"} flex-shrink-0`}>{roleLabel(m.role)}</span>
               )}
             </div>
           ))}
