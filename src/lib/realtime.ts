@@ -41,6 +41,7 @@ export function useRealtimeIssues(opts: UseRealtimeOptions = {}) {
       await setRealtimeToken(token);
 
       const sb = getSupabaseClient();
+      if (!sb) return;
       channel = sb.channel("issues");
       channel
         .on("postgres_changes", { event: "*", schema: "public", table: "issues" }, (payload) => {
@@ -55,7 +56,10 @@ export function useRealtimeIssues(opts: UseRealtimeOptions = {}) {
 
     return () => {
       unsubscribed = true;
-      if (channel) getSupabaseClient().removeChannel(channel);
+      if (channel) {
+        const sb = getSupabaseClient();
+        if (sb) sb.removeChannel(channel);
+      }
     };
   }, [enabled, qc]);
 }
@@ -75,6 +79,7 @@ export function useRealtimeNotifications(opts: { enabled?: boolean } = {}) {
       await setRealtimeToken(token);
 
       const sb = getSupabaseClient();
+      if (!sb) return;
       channel = sb.channel("notifications");
       channel
         .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
@@ -87,7 +92,10 @@ export function useRealtimeNotifications(opts: { enabled?: boolean } = {}) {
 
     return () => {
       unsubscribed = true;
-      if (channel) getSupabaseClient().removeChannel(channel);
+      if (channel) {
+        const sb = getSupabaseClient();
+        if (sb) sb.removeChannel(channel);
+      }
     };
   }, [enabled, qc]);
 }
