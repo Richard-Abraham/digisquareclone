@@ -48,6 +48,24 @@
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { @apply bg-border-accent rounded-full hover:bg-text-tertiary; }
+
+  a:focus-visible, button:focus-visible, [role="tab"]:focus-visible,
+  input:focus-visible, select:focus-visible, textarea:focus-visible {
+    @apply outline-none ring-2 ring-primary-400 ring-offset-2 ring-offset-surface-1 rounded-sm;
+  }
+
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100]
+           focus:px-4 focus:py-2 focus:rounded-lg focus:bg-primary focus:text-white focus:text-sm focus:font-medium;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 @layer components {

@@ -124,13 +124,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface">
+      <a href="#main-content" className="skip-link">Skip to content</a>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
-      <aside className={`
+      <aside aria-label="Main navigation" className={`
         fixed inset-y-0 left-0 z-50 w-64 bg-surface-1 border-r border-border flex flex-col
         bg-gradient-to-b from-surface-1 to-surface
         transform transition-transform duration-200 ease-in-out
@@ -315,7 +316,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <ThemeToggle size="sm" />
         </div>
 
-        <main className="flex-1 overflow-auto">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto focus:outline-none">
           <div className="animate-fade-in h-full">
             {children}
           </div>
