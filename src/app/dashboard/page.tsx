@@ -316,6 +316,8 @@ export default function IssuesPage() {
     </div>
   );
 
+  const activeFilterCount = [filterState, filterPriority, filterAssignee, filterSearch, myTasksOnly].filter(Boolean).length;
+
   return (
     <div className="flex flex-col h-full">
       {/* Header bar */}
@@ -362,18 +364,18 @@ export default function IssuesPage() {
               <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" />
             </svg>
             <input value={filterSearch} onChange={e => setFilterSearch(e.target.value)} placeholder="Search tasks..."
-              className="input-sm !pl-8 w-[220px] rounded-lg" />
+              className="input-sm !pl-8 w-[220px] rounded-lg" aria-label="Search tasks" />
           </div>
           <div className="h-5 w-px bg-border hidden sm:block" />
-          <select value={filterState} onChange={e => setFilterState(e.target.value)} className="select text-xs !w-auto min-w-[110px] !py-1.5 rounded-lg">
+          <select value={filterState} onChange={e => setFilterState(e.target.value)} className="select text-xs !w-auto min-w-[110px] !py-1.5 rounded-lg" aria-label="Filter by state">
             <option value="">All states</option>
             {states.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="select text-xs !w-auto min-w-[110px] !py-1.5 rounded-lg">
+          <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="select text-xs !w-auto min-w-[110px] !py-1.5 rounded-lg" aria-label="Filter by priority">
             <option value="">All priorities</option>
             {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_META[p].label}</option>)}
           </select>
-          <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="select text-xs !w-auto min-w-[130px] !py-1.5 rounded-lg">
+          <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="select text-xs !w-auto min-w-[130px] !py-1.5 rounded-lg" aria-label="Filter by assignee">
             <option value="">All members</option>
             {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profile?.display_name || "User"}</option>)}
           </select>
@@ -381,13 +383,17 @@ export default function IssuesPage() {
             onClick={() => setMyTasksOnly(v => !v)}
             className={`btn-sm rounded-lg text-xs font-medium transition-all ${myTasksOnly ? "btn-primary" : "btn-secondary"}`}
             title="Show only tasks assigned to you"
+            aria-pressed={myTasksOnly}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
             My Tasks
           </button>
-          {(filterState || filterPriority || filterAssignee || filterSearch || myTasksOnly) && (
+          {activeFilterCount > 0 && (
             <button onClick={() => { setFilterState(""); setFilterPriority(""); setFilterAssignee(""); setFilterSearch(""); setMyTasksOnly(false); }}
-              className="btn-ghost btn-sm text-xs rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors">Clear</button>
+              className="btn-ghost btn-sm text-xs rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors flex items-center gap-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              Clear ({activeFilterCount})
+            </button>
           )}
         </div>
       </div>
@@ -395,12 +401,16 @@ export default function IssuesPage() {
       {/* Insights (collapsible) */}
       {showInsights && issues.length > 0 && (
         <div className="flex-shrink-0 px-4 sm:px-6 py-4 border-b border-border-subtle bg-surface animate-fade-in space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            <StatCard label="Total Tasks" value={total} icon={<TasksIcon />} />
-            <StatCard label="Team Members" value={members.length} icon={<UserIcon />} />
-            <StatCard label="Active" value={statsByState.started || 0} sub="In Progress" icon={<ChartIcon />} color={chartColors.amber} />
-            <StatCard label="Completed" value={statsByState.completed || 0} sub="Done" icon={<CheckIcon size={18} />} color={chartColors.emerald} />
-            <StatCard label="Overdue" value={overdueCount} sub={overdueCount > 0 ? "Needs attention" : "On track"} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>} color={overdueCount > 0 ? chartColors.red : chartColors.emerald} />
+          {/* Overview stats */}
+          <div>
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-2.5">Overview</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <StatCard label="Total Tasks" value={total} icon={<TasksIcon />} />
+              <StatCard label="Team Members" value={members.length} icon={<UserIcon />} />
+              <StatCard label="Active" value={statsByState.started || 0} sub="In Progress" icon={<ChartIcon />} color={chartColors.amber} />
+              <StatCard label="Completed" value={statsByState.completed || 0} sub="Done" icon={<CheckIcon size={18} />} color={chartColors.emerald} />
+              <StatCard label="Overdue" value={overdueCount} sub={overdueCount > 0 ? "Needs attention" : "On track"} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>} color={overdueCount > 0 ? chartColors.red : chartColors.emerald} />
+            </div>
           </div>
 
           {/* Completion rate progress bar */}
@@ -418,17 +428,21 @@ export default function IssuesPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            {priorityChartData.length > 0 && (
-              <ChartCard title="Priority Distribution">
-                <DonutChart data={priorityChartData} dataKey="count" nameKey="name" colors={[chartColors.red, chartColors.amber, chartColors.primary, chartColors.slate, "#CBD5E1"]} height={200} innerRadius={40} outerRadius={70} />
-              </ChartCard>
-            )}
-            {stateChartData.length > 0 && (
-              <ChartCard title="State Breakdown">
-                <ColoredBarChart data={stateChartData} xKey="name" yKey="count" colorMap={STATE_COLORS} height={180} barSize={36} />
-              </ChartCard>
-            )}
+          {/* Distribution charts */}
+          <div>
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-2.5">Distribution</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {priorityChartData.length > 0 && (
+                <ChartCard title="Priority Distribution">
+                  <DonutChart data={priorityChartData} dataKey="count" nameKey="name" colors={[chartColors.red, chartColors.amber, chartColors.primary, chartColors.slate, "#CBD5E1"]} height={200} innerRadius={40} outerRadius={70} />
+                </ChartCard>
+              )}
+              {stateChartData.length > 0 && (
+                <ChartCard title="State Breakdown">
+                  <ColoredBarChart data={stateChartData} xKey="name" yKey="count" colorMap={STATE_COLORS} height={180} barSize={36} />
+                </ChartCard>
+              )}
+            </div>
           </div>
         </div>
       )}

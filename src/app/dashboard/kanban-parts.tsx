@@ -40,6 +40,7 @@ function CardBody({ issue }: { issue: Issue }) {
   const prio = PRIO_META[issue.priority] || PRIO_META.none;
   const due = issue.target_date ? formatDue(issue.target_date) : null;
   const subPct = issue.subtask_total ? Math.round(((issue.subtask_done || 0) / issue.subtask_total) * 100) : 0;
+  const subColor = subPct >= 70 ? "#10B981" : subPct >= 30 ? "#F59E0B" : "#EF4444";
   return (
     <>
       {/* Top row: identifier + badges */}
@@ -72,7 +73,7 @@ function CardBody({ issue }: { issue: Issue }) {
             <span className="text-[10px] text-text-tertiary font-semibold">{issue.subtask_done}/{issue.subtask_total}</span>
           </div>
           <div className="h-1 rounded-full bg-surface-2 overflow-hidden">
-            <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${subPct}%` }} />
+            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${subPct}%`, backgroundColor: subColor }} />
           </div>
         </div>
       )}
@@ -84,10 +85,11 @@ function CardBody({ issue }: { issue: Issue }) {
             "inline-flex items-center gap-1 text-[10px] font-medium",
             due.overdue ? "text-red-500" : "text-text-tertiary"
           )}>
+            {due.overdue && <span className="size-1.5 rounded-full bg-red-500 animate-pulse-soft" />}
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" />
             </svg>
-            {due.label}
+            {due.label}{due.overdue ? " · overdue" : ""}
           </span>
         ) : <span />}
         {issue.assignees?.length > 0 && (
@@ -118,6 +120,7 @@ interface KanbanCardProps {
 
 export function KanbanCard({ issue, stateColor, onOpen }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: issue.id });
+  const prio = PRIO_META[issue.priority] || PRIO_META.none;
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -137,6 +140,9 @@ export function KanbanCard({ issue, stateColor, onOpen }: KanbanCardProps) {
         isDragging && "opacity-40 ring-2 ring-primary-300 scale-[1.02]"
       )}
     >
+      {issue.priority !== "none" && issue.priority !== "low" && (
+        <span className="absolute top-0 right-0 w-1.5 h-full rounded-r" style={{ backgroundColor: prio.color }} />
+      )}
       <span className="absolute bottom-2.5 right-2.5 text-text-tertiary/0 group-hover:text-text-tertiary/60 transition-colors">
         <GripIcon size={12} />
       </span>
@@ -169,6 +175,12 @@ const GROUP_LABELS: Record<Group, string> = {
 export function KanbanColumn({ group, items, stateInfo, droppable, activeId, onOpen }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: group, disabled: !droppable });
   const showDropHere = activeId !== null && items.length === 0;
+  const count = items.length;
+  const countColor = count > 10 ? "#EF4444" : count > 5 ? "#F59E0B" : "#6366F1";
+  const headerGradient = stateInfo?.color
+    ? `linear-gradient(135deg, ${stateInfo.color}10, transparent)`
+    : undefined;
+
   return (
     <div
       className={clsx(
@@ -178,7 +190,7 @@ export function KanbanColumn({ group, items, stateInfo, droppable, activeId, onO
       )}
     >
       {/* Column header */}
-      <div className="flex items-center justify-between px-3.5 pt-3.5 pb-2.5 flex-shrink-0 border-b border-border-subtle/80">
+      <div className="flex items-center justify-between px-3.5 pt-3.5 pb-2.5 flex-shrink-0 border-b border-border-subtle/80" style={{ background: headerGradient }}>
         <div className="flex items-center gap-2">
           <span className="size-2.5 rounded-full ring-[3px]" style={{
             backgroundColor: stateInfo?.color || "#94A3B8",
@@ -186,8 +198,9 @@ export function KanbanColumn({ group, items, stateInfo, droppable, activeId, onO
           }} />
           <span className="text-xs font-bold text-text-primary tracking-wide">{stateInfo?.name || GROUP_LABELS[group]}</span>
         </div>
-        <span className="text-[11px] font-bold text-text-secondary min-w-[22px] h-[20px] px-1.5 rounded-lg bg-surface-card border border-border-subtle flex items-center justify-center shadow-sm">
-          {items.length}
+        <span className="text-[11px] font-bold min-w-[22px] h-[20px] px-1.5 rounded-lg flex items-center justify-center shadow-sm border"
+          style={{ backgroundColor: `${countColor}10`, borderColor: `${countColor}30`, color: countColor }}>
+          {count}
         </span>
       </div>
 
@@ -201,11 +214,16 @@ export function KanbanColumn({ group, items, stateInfo, droppable, activeId, onO
         {items.length === 0 && (
           <div
             className={clsx(
-              "text-xs text-center py-8 rounded-xl border-2 border-dashed transition-colors",
+              "text-xs text-center py-8 rounded-xl border-2 border-dashed transition-colors flex flex-col items-center gap-1.5",
               isOver && droppable ? "border-primary-300 bg-primary-50/50 text-primary dark:bg-primary-500/10" : showDropHere ? "border-border-accent text-text-tertiary" : "border-border/70 text-text-tertiary"
             )}
           >
-            {isOver && droppable ? "Drop here" : "No tasks"}
+            {isOver && droppable ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 9h6M9 13h6" /></svg>
+            )}
+            <span>{isOver && droppable ? "Drop here" : "No tasks"}</span>
           </div>
         )}
       </div>
