@@ -5,6 +5,7 @@ import { getUser } from "@/lib/auth";
 import { getProjectAccess } from "@/lib/access";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { resolveProfiles } from "@/lib/profiles";
 
 // Bundle all data the issue detail page needs into a single endpoint.
 // Replaces 9 separate API round-trips with one.
@@ -44,10 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       ...(membersRes.data || []).map((m: any) => m.user_id),
     ].filter(Boolean)));
 
-    const { data: profiles } = allUserIds.length
-      ? await getAdmin().from("profiles").select("user_id, display_name, avatar_url").in("user_id", allUserIds)
-      : { data: [] };
-    const pm = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+    const pm = await resolveProfiles(allUserIds);
 
     const enrichedIssue = {
       ...issue,

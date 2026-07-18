@@ -6,6 +6,7 @@ import { getWorkspaceAccess } from "@/lib/access";
 import { isAssignableRole, MEMBER_ROLE } from "@/lib/tasks";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { resolveProfiles } from "@/lib/profiles";
 
 // List workspace members. Managers also get `candidates`: registered users
 // (profiles) who aren't members yet, for the "add member" picker.
@@ -22,8 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
     const { data: members } = await getAdmin().from("workspace_members").select("user_id, role").eq("workspace_id", wsId);
     const ids = (members || []).map((m: any) => m.user_id);
-    const { data: profiles } = ids.length ? await getAdmin().from("profiles").select("*").in("user_id", ids) : { data: [] };
-    const pm = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+    const pm = await resolveProfiles(ids);
 
     const rows = (members || []).map((m: any) => ({
       user_id: m.user_id,

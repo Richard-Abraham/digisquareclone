@@ -7,6 +7,7 @@ import { reviewerTransitions, isCompletedGroup } from "@/lib/tasks";
 import { getProjectAccess } from "@/lib/access";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { resolveProfiles } from "@/lib/profiles";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string; projectId: string; issueId: string } }) {
   try {
@@ -22,8 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     if (!data) return err("Not found", 404);
 
     const userIds = Array.from(new Set([data.assignee_id, ...(data.assignees || []).map((a: any) => a.user_id)].filter(Boolean)));
-    const { data: profiles } = userIds.length ? await getAdmin().from("profiles").select("*").in("user_id", userIds) : { data: [] };
-    const pm = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+    const pm = await resolveProfiles(userIds);
 
     return ok({
       ...data,
