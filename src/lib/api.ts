@@ -1,7 +1,5 @@
 "use client";
 
-import { logger } from "./logger";
-
 // Tiny client-side fetch wrapper: attaches the bearer token and unwraps { success, data }.
 // R4: Added timeout via AbortController (10s default).
 // P7: Supports an external AbortSignal for cancellation on unmount.
@@ -88,7 +86,6 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
     if (!json.success) throw new Error(json.error || `Request failed (${res.status})`);
     return json.data as T;
   } catch (e: unknown) {
-    logger.error("api request failed", e, { path, method: opts.method });
     if ((e as Error)?.name === "AbortError") throw new Error("Request timed out");
     throw e;
   } finally {

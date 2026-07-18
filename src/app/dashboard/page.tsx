@@ -17,6 +17,7 @@ import { StatCard, ChartCard, DonutChart, BarChart, ColoredBarChart, chartColors
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Drawer } from "@/components/ui/Drawer";
+import { ErrorState } from "@/components/ui/States";
 import { CreateTaskDrawer } from "@/components/issue/CreateTaskDrawer";
 import IssuePanel from "./issue-panel";
 import {
@@ -56,6 +57,7 @@ export default function IssuesPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showInsights, setShowInsights] = useState(true);
   const [columns, setColumns] = useState<Record<Group, Issue[]>>(emptyColumns());
+  const [loadError, setLoadError] = useState<string | null>(null);
   const router = useRouter();
 
   useRealtimeIssues({ enabled: !!projId });
@@ -113,8 +115,11 @@ export default function IssuesPage() {
     params.set("pageSize", String(PAGE_SIZE));
     try {
       const res = await api<{ issues: Issue[]; total: number }>(`/api/workspaces/${s}/projects/${p}/issues?${params}`);
-      setIssues(res.issues); setTotal(res.total);
-    } catch {} finally { setLoading(false); }
+      setIssues(res.issues); setTotal(res.total); setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Failed to load issues");
+      setIssues([]); setTotal(0);
+    } finally { setLoading(false); }
   }, [wsSlug, projId, filterState, filterPriority, filterAssignee, filterSearch, page]);
 
   useEffect(() => { if (wsSlug && projId) { setPage(1); loadIssues(); } }, [filterState, filterPriority, filterAssignee, filterSearch]);
@@ -271,6 +276,13 @@ export default function IssuesPage() {
         <p className="text-sm text-text-secondary">Loading tasks...</p>
       </div>
     </div>
+  );
+
+  if (loadError) return (
+    <ErrorState
+      message={loadError}
+      onRetry={() => { setLoadError(null); setLoading(true); loadIssues(); }}
+    />
   );
 
   if (wsSlug && projects.length === 0) return (

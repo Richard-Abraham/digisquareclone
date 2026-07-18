@@ -84,7 +84,7 @@ export async function getProjectAccess(projectId: string, userId: string): Promi
     .eq("id", projectId)
     .single() as any;
   if (!proj) return null;
-  const ws = proj.workspace;
+  const ws = Array.isArray(proj.workspace) ? proj.workspace[0] : proj.workspace;
   if (!ws) return null;
 
   // 2nd query: workspace membership for this user.

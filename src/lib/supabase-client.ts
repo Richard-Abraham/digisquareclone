@@ -4,16 +4,13 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { clientEnv } from "./env";
 import { logger } from "./logger";
 
+const PLACEHOLDER_VALUES = new Set(["", "your_anon_key", "placeholder"]);
+
 let client: SupabaseClient | null = null;
-let warned = false;
 
 export function getSupabaseClient(): SupabaseClient | null {
   if (client) return client;
-  if (!clientEnv.SUPABASE_URL || !clientEnv.SUPABASE_ANON_KEY) {
-    if (!warned) {
-      logger.warn("Supabase client env vars not set — realtime disabled");
-      warned = true;
-    }
+  if (!clientEnv.SUPABASE_URL || !clientEnv.SUPABASE_ANON_KEY || PLACEHOLDER_VALUES.has(clientEnv.SUPABASE_ANON_KEY)) {
     return null;
   }
   client = createClient(clientEnv.SUPABASE_URL, clientEnv.SUPABASE_ANON_KEY, {
