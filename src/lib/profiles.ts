@@ -32,7 +32,11 @@ export async function resolveProfiles(
     const authMap = new Map((data.users || []).map((u) => [u.id, u]));
     for (const id of missing) {
       const u = authMap.get(id);
-      if (u?.email) {
+      if (!u) continue;
+      const fullName = (u.user_metadata as Record<string, string>)?.full_name;
+      if (fullName?.trim()) {
+        map.set(id, { user_id: id, display_name: fullName.trim(), avatar_url: null });
+      } else if (u.email) {
         map.set(id, { user_id: id, display_name: u.email.split("@")[0], avatar_url: null });
       }
     }

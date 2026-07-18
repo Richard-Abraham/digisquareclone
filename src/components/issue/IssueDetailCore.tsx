@@ -125,7 +125,7 @@ export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: extern
     if (m.profile?.display_name) return m.profile.display_name;
     const a = (issue?.assignees || []).find((a) => a.user_id === m.user_id);
     if (a?.display_name) return a.display_name;
-    return m.user_id.slice(0, 8);
+    return "Unknown member";
   }
 
   async function toggleAssignee(uid: string) {

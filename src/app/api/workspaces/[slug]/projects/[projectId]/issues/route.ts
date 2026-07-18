@@ -8,6 +8,7 @@ import { ensureProjectMembers, getProjectAccess } from "@/lib/access";
 import { assignmentNotificationKind } from "@/lib/tasks";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { resolveProfiles } from "@/lib/profiles";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string; projectId: string } }) {
   try {
@@ -71,8 +72,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     const userIds = Array.from(new Set(rows.flatMap((i: any) => [
       i.assignee_id, i.created_by, ...(i.assignees || []).map((a: any) => a.user_id),
     ]).filter(Boolean)));
-    const { data: profiles } = userIds.length ? await getAdmin().from("profiles").select("user_id, display_name").in("user_id", userIds) : { data: [] };
-    const pm = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+    const pm = await resolveProfiles(userIds);
     const enriched = rows.map((i: any) => ({
       ...i,
       assignee: i.assignee_id ? pm.get(i.assignee_id) || null : null,
