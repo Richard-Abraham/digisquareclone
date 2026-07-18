@@ -20,6 +20,8 @@ const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+const isServer = typeof window === "undefined";
+
 function validateEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
@@ -29,10 +31,12 @@ function validateEnv(): Env {
   return parsed.data;
 }
 
-export const env = validateEnv();
+// Only validate on the server — client bundles don't have access to
+// server-only env vars like SUPABASE_URL / SUPABASE_SERVICE_KEY.
+export const env = isServer ? validateEnv() : ({} as Env);
 
 // Client-safe subset (must be NEXT_PUBLIC_*)
 export const clientEnv = {
-  SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL,
-  SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || "",
+  SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || (isServer ? env.SUPABASE_URL : ""),
+  SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || (isServer ? env.SUPABASE_ANON_KEY : "") || "",
 };
