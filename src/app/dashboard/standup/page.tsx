@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useWorkspace } from "@/lib/hooks";
 import { CheckIcon, SpinnerIcon } from "@/components/icons";
+import { CalendarDays, Plus, CalendarX } from "lucide-react";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { Spinner, EmptyState } from "@/components/ui/States";
@@ -177,7 +178,7 @@ export default function StandupPage() {
       <div className="section-header flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex size-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 shadow-sm items-center justify-center flex-shrink-0 text-white">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+            <CalendarDays size={20} />
           </div>
           <div>
             <h1 className="section-title">Daily Standup</h1>
@@ -219,7 +220,7 @@ export default function StandupPage() {
                     <button key={s.issue_id} type="button" onClick={() => addTaskAsPlan(s)}
                       className="w-full flex items-center gap-2.5 text-sm py-1.5 hover:bg-surface-card rounded-lg px-2 transition-colors text-left">
                       <span className="size-5 rounded-md bg-primary-100/70 text-primary flex items-center justify-center flex-shrink-0">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                        <Plus size={12} strokeWidth={2.5} />
                       </span>
                       <span className="text-[10px] font-mono text-text-tertiary flex-shrink-0">#{s.ref}</span>
                       <span className="flex-1 truncate text-text-primary font-medium">{s.title}</span>
@@ -396,7 +397,7 @@ export default function StandupPage() {
           )}
           {history.length === 0 ? (
             <EmptyState
-              icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>}
+              icon={<CalendarX size={24} />}
               title="No submitted standups yet"
               description="Standups will appear here once team members submit them."
             />

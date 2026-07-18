@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useWorkspace } from "@/lib/hooks";
 import { CheckIcon, CloseIcon, FolderIcon } from "@/components/icons";
+import { Plus, Users, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Drawer } from "@/components/ui/Drawer";
@@ -117,7 +118,7 @@ export default function ProjectsPage() {
           </div>
         </div>
         <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+          <Plus size={14} strokeWidth={2.5} />
           New Project
         </Button>
       </div>
@@ -162,14 +163,14 @@ export default function ProjectsPage() {
                           <span className="text-[11px] text-text-tertiary font-mono">{p.identifier}</span>
                         </button>
                         <span className="text-xs text-text-tertiary px-2 flex-shrink-0 flex items-center gap-1">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
+                          <Users size={12} />
                           {members.length}
                         </span>
                         <Link href={`/dashboard?proj=${p.id}`} className="btn-secondary btn-sm flex-shrink-0">Open</Link>
                         {isManager && <button onClick={() => { setRenamingId(p.id); setRenameValue(p.name); setMsg(null); }} className="btn-ghost btn-sm text-text-tertiary hover:text-primary flex-shrink-0">Rename</button>}
                         {isManager && <button onClick={() => setDeleteTarget(p)} disabled={busyId === p.id} className="btn-ghost btn-sm text-text-tertiary hover:text-red-500 flex-shrink-0">Delete</button>}
                         <button onClick={() => toggleOpen(p.id)} className={`btn-ghost btn-icon transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`} aria-label="Toggle members" aria-expanded={isOpen}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+                          <ChevronDown size={14} strokeWidth={2.5} />
                         </button>
                       </>
                     )}

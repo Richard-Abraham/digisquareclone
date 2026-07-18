@@ -15,6 +15,7 @@ import { logger } from "@/lib/logger";
 import {
   TasksIcon, UserIcon, CalendarIcon, BellIcon, UsersIcon, ChartIcon, FolderIcon,
 } from "@/components/icons";
+import { X, BellOff, LogOut, Menu } from "lucide-react";
 
 const SHORTCUTS: Record<string, string> = {
   Board: "N",
@@ -142,9 +143,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex-shrink-0">
           <div className="flex items-center gap-2 px-5 h-16 border-b border-border-subtle">
             <button onClick={() => setSidebarOpen(false)} className="lg:hidden btn-ghost btn-icon btn-sm -ml-2 mr-1" aria-label="Close sidebar">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
+              <X size={18} />
             </button>
             <Logo size={34} wordmarkClassName="text-[17px]" />
           </div>
@@ -223,7 +222,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                               ) : (
                                 <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
                                   <div className="size-10 rounded-xl bg-surface-2 flex items-center justify-center text-text-tertiary mb-2">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>
+                                    <BellOff size={20} strokeWidth={1.5} />
                                   </div>
                                   <p className="text-xs font-medium text-text-secondary">All caught up!</p>
                                   <p className="text-[10px] text-text-tertiary mt-0.5">No new notifications</p>
@@ -294,7 +293,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   router.push("/login");
                 }}
                   disabled={loggingOut} className="btn-ghost btn-icon btn-sm text-text-tertiary hover:text-red-500" title="Sign out" aria-label="Sign out">
-                  {loggingOut ? <SpinnerIcon size={16} className="animate-spin" /> : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>}
+                  {loggingOut ? <SpinnerIcon size={16} className="animate-spin" /> : <LogOut size={16} />}
                 </button>
               </div>
             </div>
@@ -307,9 +306,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Mobile top bar */}
         <div className="lg:hidden flex items-center gap-3 px-4 h-14 border-b border-border bg-surface-1 flex-shrink-0">
           <button onClick={() => setSidebarOpen(true)} className="btn-ghost btn-icon btn-sm -ml-2" aria-label="Open sidebar">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
+            <Menu size={20} />
           </button>
           <Logo size={28} showWordmark={false} />
           <span className="font-bold text-sm text-text-primary flex-1">Digisystem</span>

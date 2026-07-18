@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useRealtimeIssues } from "@/lib/realtime";
 import { BugIcon, CheckIcon, CloseIcon, SpinnerIcon } from "@/components/icons";
+import { ArrowLeft } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IssueDetailCore } from "@/components/issue/IssueDetailCore";
 
@@ -137,9 +138,7 @@ function IssueDetailPageContent() {
       {/* Back + header */}
       <div className="flex items-center gap-3">
         <Link href="/dashboard" className="btn-ghost btn-icon btn-sm -ml-2">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5m7-7-7 7 7 7" />
-          </svg>
+          <ArrowLeft size={16} strokeWidth={2.5} />
         </Link>
         <span className="text-sm font-mono text-text-tertiary">#{issue.sequence_id}</span>
         <span className={`badge ${prio.color === "#DC2626" ? "badge-danger" : prio.color === "#D97706" ? "badge-warning" : "badge-neutral"}`}

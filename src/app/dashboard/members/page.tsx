@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner, EmptyState } from "@/components/ui/States";
 import { SpinnerIcon } from "@/components/icons";
+import { Users, Search } from "lucide-react";
 
 interface Member { user_id: string; role: number; is_owner: boolean; profile: { display_name?: string } | null }
 interface Candidate { user_id: string; display_name: string }
@@ -93,7 +94,7 @@ export default function MembersPage() {
       <div className="section-header">
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex size-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 shadow-sm items-center justify-center flex-shrink-0 text-white">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+            <Users size={20} />
           </div>
           <div>
             <h1 className="section-title">Members</h1>
@@ -107,9 +108,7 @@ export default function MembersPage() {
       {/* Search bar */}
       {members.length > 3 && (
         <div className="relative mb-5">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" />
-          </svg>
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search members..."
             className="input !pl-9 rounded-lg" aria-label="Search members" />
         </div>

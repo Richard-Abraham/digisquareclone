@@ -1,4 +1,5 @@
 import { SpinnerIcon } from "@/components/icons";
+import { AlertCircle } from "lucide-react";
 import clsx from "clsx";
 
 interface SpinnerProps {
@@ -44,11 +45,7 @@ export function ErrorState({ message = "Something went wrong", onRetry, classNam
   return (
     <div className={clsx("empty-state", className)}>
       <div className="empty-state-icon text-red-500">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="12" y1="8" x2="12" y2="12" />
-          <line x1="12" y1="16" x2="12.01" y2="16" />
-        </svg>
+        <AlertCircle size={24} strokeWidth={1.5} />
       </div>
       <p className="empty-state-title">{message}</p>
       {onRetry && (

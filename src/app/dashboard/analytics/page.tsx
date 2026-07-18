@@ -5,6 +5,7 @@ import { useWorkspace, useProjects } from "@/lib/hooks";
 import { Tabs } from "@/components/ui/Tabs";
 import { Spinner, EmptyState } from "@/components/ui/States";
 import { ChartCard, LineChart, BarChart, ColoredBarChart, StatCard, chartColors, STATE_COLORS } from "@/components/charts";
+import { BarChart3, Folder, CircleCheckBig, Users, CircleCheck } from "lucide-react";
 
 const GROUP_LABELS: Record<string, string> = { backlog: "Backlog", unstarted: "Todo", started: "In Progress", completed: "Done", cancelled: "Cancelled" };
 const TABS = [{ key: "overview", label: "Overview" }, { key: "work-items", label: "Work Items" }];
@@ -52,7 +53,7 @@ export default function AnalyticsPage() {
       <div className="section-header flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex size-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 shadow-sm items-center justify-center flex-shrink-0 text-white">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>
+            <BarChart3 size={20} />
           </div>
           <div>
             <h1 className="section-title">Analytics</h1>
@@ -76,10 +77,10 @@ export default function AnalyticsPage() {
           <div>
             <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-2.5">Overview</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatCard label="Total Projects" value={overview.total_projects} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>} />
-              <StatCard label="Total Tasks" value={totalTasks} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>} />
-              <StatCard label="Team Members" value={overview.total_members} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>} />
-              <StatCard label="Completion" value={`${completionRate}%`} sub={`${completedTasks} done`} color={chartColors.emerald} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>} />
+              <StatCard label="Total Projects" value={overview.total_projects} icon={<Folder size={18} />} />
+              <StatCard label="Total Tasks" value={totalTasks} icon={<CircleCheckBig size={18} />} />
+              <StatCard label="Team Members" value={overview.total_members} icon={<Users size={18} />} />
+              <StatCard label="Completion" value={`${completionRate}%`} sub={`${completedTasks} done`} color={chartColors.emerald} icon={<CircleCheck size={18} />} />
             </div>
           </div>
 

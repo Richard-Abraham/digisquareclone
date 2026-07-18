@@ -4,6 +4,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { useWorkspace } from "@/lib/hooks";
 import { BugIcon } from "@/components/icons";
+import { Search, CheckCircle2, Clock, CircleCheckBig, UserCircle, Folder, Calendar } from "lucide-react";
 import { Tabs } from "@/components/ui/Tabs";
 import { Spinner, EmptyState, ErrorState } from "@/components/ui/States";
 import { StatCard } from "@/components/charts";
@@ -142,7 +143,7 @@ export default function MyTasksPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3 min-w-0">
           <div className="hidden sm:flex size-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 shadow-sm items-center justify-center flex-shrink-0 text-white">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+            <UserCircle size={20} />
           </div>
           <div className="min-w-0">
             <h1 className="text-lg font-bold text-text-primary font-display tracking-tight">My Tasks</h1>
@@ -152,9 +153,7 @@ export default function MyTasksPage() {
         {/* Search + Sort */}
         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
           <div className="relative">
-            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" />
-            </svg>
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
               className="input-sm !pl-8 w-[180px] rounded-lg" aria-label="Search tasks" />
           </div>
@@ -178,9 +177,9 @@ export default function MyTasksPage() {
       {/* Stat cards */}
       {tasks.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <StatCard label="Total" value={stats.total} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>} />
-          <StatCard label="In Progress" value={stats.inProgress} color="#F59E0B" icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>} />
-          <StatCard label="Overdue" value={stats.overdue} sub={stats.overdue > 0 ? "Needs attention" : "On track"} color={stats.overdue > 0 ? "#EF4444" : "#10B981"} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>} />
+          <StatCard label="Total" value={stats.total} icon={<CircleCheckBig size={18} />} />
+          <StatCard label="In Progress" value={stats.inProgress} color="#F59E0B" icon={<Clock size={18} />} />
+          <StatCard label="Overdue" value={stats.overdue} sub={stats.overdue > 0 ? "Needs attention" : "On track"} color={stats.overdue > 0 ? "#EF4444" : "#10B981"} icon={<Clock size={18} />} />
           <StatCard label="Bugs" value={stats.bugs} color="#DC2626" icon={<BugIcon size={18} />} />
         </div>
       )}
@@ -192,7 +191,7 @@ export default function MyTasksPage() {
 
       {filteredTasks.length === 0 ? (
         <EmptyState
-          icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>}
+          icon={<CircleCheckBig size={24} />}
           title={search.trim() ? "No matches" : emptyMsg.title}
           description={search.trim() ? "Try a different search term." : emptyMsg.description}
         />
@@ -202,9 +201,7 @@ export default function MyTasksPage() {
             <div key={group.projectName}>
               {/* Project group header */}
               <div className="flex items-center gap-2 mb-3">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-tertiary">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                </svg>
+                <Folder size={14} className="text-text-tertiary" />
                 <h2 className="text-sm font-bold text-text-primary">{group.projectName}</h2>
                 <span className="text-[10px] font-bold text-text-tertiary min-w-[20px] h-5 px-1.5 rounded-lg bg-surface-2 border border-border-subtle flex items-center justify-center">
                   {group.tasks.length}
@@ -247,9 +244,7 @@ export default function MyTasksPage() {
                         {due && (
                           <span className={clsx("inline-flex items-center gap-1 text-[10px] font-medium flex-shrink-0", due.overdue ? "text-red-500" : "text-text-tertiary")}>
                             {due.overdue && <span className="size-1.5 rounded-full bg-red-500 animate-pulse-soft" />}
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" />
-                            </svg>
+                            <Calendar size={11} />
                             {due.label}
                             {due.overdue ? ` · ${Math.abs(due.daysUntil)}d overdue` : due.daysUntil === 0 ? " · today" : due.daysUntil <= 3 ? ` · ${due.daysUntil}d left` : ""}
                           </span>

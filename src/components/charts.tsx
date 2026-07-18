@@ -15,6 +15,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ChevronUp } from "lucide-react";
 
 export const chartColors = {
   primary: "#6366F1",
@@ -183,9 +184,7 @@ export function StatCard({ label, value, sub, icon, color, trend, onClick }: { l
         <p className="text-3xl font-bold text-text-primary font-display tracking-tight">{typeof value === "number" ? value.toLocaleString() : value}</p>
         {trend && (
           <span className={`text-xs font-bold flex items-center gap-0.5 ${trend.value >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: trend.value >= 0 ? "none" : "rotate(180deg)" }}>
-              <path d="M7 17l5-5 5 5" /><path d="M7 11l5-5 5 5" />
-            </svg>
+            <ChevronUp size={10} strokeWidth={3} style={{ transform: trend.value >= 0 ? "none" : "rotate(180deg)" }} />
             {Math.abs(trend.value)}%
           </span>
         )}

@@ -3,6 +3,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { BugIcon, GripIcon } from "@/components/icons";
+import { Calendar, Plus, SquareDashed } from "lucide-react";
 import clsx from "clsx";
 
 export interface Issue {
@@ -86,9 +87,7 @@ function CardBody({ issue }: { issue: Issue }) {
             due.overdue ? "text-red-500" : "text-text-tertiary"
           )}>
             {due.overdue && <span className="size-1.5 rounded-full bg-red-500 animate-pulse-soft" />}
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" />
-            </svg>
+            <Calendar size={11} />
             {due.label}{due.overdue ? " · overdue" : ""}
           </span>
         ) : <span />}
@@ -219,9 +218,9 @@ export function KanbanColumn({ group, items, stateInfo, droppable, activeId, onO
             )}
           >
             {isOver && droppable ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+              <Plus size={16} />
             ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 9h6M9 13h6" /></svg>
+              <SquareDashed size={14} strokeWidth={1.5} className="opacity-40" />
             )}
             <span>{isOver && droppable ? "Drop here" : "No tasks"}</span>
           </div>
