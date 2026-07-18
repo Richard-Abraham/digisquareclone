@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { deriveIdentifier } from "@/lib/tasks";
 import { useRealtimeIssues } from "@/lib/realtime";
 import { TasksIcon, SpinnerIcon, UserIcon, ChartIcon, CheckIcon } from "@/components/icons";
-import { StatCard, ChartCard, DonutChart, BarChart, chartColors } from "@/components/charts";
+import { StatCard, ChartCard, DonutChart, BarChart, ColoredBarChart, chartColors, STATE_COLORS } from "@/components/charts";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Drawer } from "@/components/ui/Drawer";
@@ -43,6 +43,7 @@ export default function IssuesPage() {
   const [filterPriority, setFilterPriority] = useState("");
   const [filterAssignee, setFilterAssignee] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
+  const [myTasksOnly, setMyTasksOnly] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [wsSlug, setWsSlug] = useState("");
   const [projId, setProjId] = useState("");
@@ -118,13 +119,19 @@ export default function IssuesPage() {
   useEffect(() => { if (wsSlug && projId) { setPage(1); loadIssues(); } }, [filterState, filterPriority, filterAssignee, filterSearch]);
   useEffect(() => { if (wsSlug && projId) loadIssues(); }, [page]);
 
+  // Filtered issues for display (myTasksOnly)
+  const displayedIssues = useMemo(() => {
+    if (!myTasksOnly || !user) return issues;
+    return issues.filter(i => (i.assignees || []).some(a => a.user_id === user.id));
+  }, [issues, myTasksOnly, user]);
+
   // Derive columns from server data; sync local board when data changes (not during a drag).
   const derivedColumns = useMemo(() => {
     const g = emptyColumns();
-    for (const i of issues) { const k = (i.state?.group_name as Group) || "backlog"; g[k].push(i); }
+    for (const i of displayedIssues) { const k = (i.state?.group_name as Group) || "backlog"; g[k].push(i); }
     for (const k of GROUPS) g[k].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     return g;
-  }, [issues]);
+  }, [displayedIssues]);
   useEffect(() => { setColumns(derivedColumns); }, [derivedColumns]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -132,11 +139,18 @@ export default function IssuesPage() {
   // Derived stats
   const statsByPriority: Record<string, number> = { urgent: 0, high: 0, medium: 0, low: 0, none: 0 };
   const statsByState: Record<string, number> = {};
+  let overdueCount = 0;
   for (const i of issues) {
     const g = i.state?.group_name || "backlog";
     statsByState[g] = (statsByState[g] || 0) + 1;
     if (statsByPriority[i.priority] !== undefined) statsByPriority[i.priority]++;
+    if (i.target_date && i.state?.group_name !== "completed" && i.state?.group_name !== "cancelled") {
+      const d = new Date(i.target_date + "T00:00:00");
+      if (d < new Date()) overdueCount++;
+    }
   }
+  const completedCount = statsByState.completed || 0;
+  const completionRate = total > 0 ? Math.round((completedCount / total) * 100) : 0;
   const priorityChartData = Object.entries(statsByPriority)
     .filter(([, v]) => v > 0)
     .map(([k, v]) => ({ name: k, count: v }));
@@ -323,7 +337,7 @@ export default function IssuesPage() {
                 )}
               </div>
               <p className="text-[11px] text-text-tertiary mt-0.5">
-                {total} task{total === 1 ? "" : "s"} · {statsByState.started || 0} in progress · {statsByState.completed || 0} done
+                {total} task{total === 1 ? "" : "s"} · {statsByState.started || 0} in progress · {statsByState.completed || 0} done{overdueCount > 0 ? ` · ${overdueCount} overdue` : ""}
               </p>
             </div>
           </div>
@@ -363,8 +377,16 @@ export default function IssuesPage() {
             <option value="">All members</option>
             {members.map(m => <option key={m.user_id} value={m.user_id}>{m.profile?.display_name || "User"}</option>)}
           </select>
-          {(filterState || filterPriority || filterAssignee || filterSearch) && (
-            <button onClick={() => { setFilterState(""); setFilterPriority(""); setFilterAssignee(""); setFilterSearch(""); }}
+          <button
+            onClick={() => setMyTasksOnly(v => !v)}
+            className={`btn-sm rounded-lg text-xs font-medium transition-all ${myTasksOnly ? "btn-primary" : "btn-secondary"}`}
+            title="Show only tasks assigned to you"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+            My Tasks
+          </button>
+          {(filterState || filterPriority || filterAssignee || filterSearch || myTasksOnly) && (
+            <button onClick={() => { setFilterState(""); setFilterPriority(""); setFilterAssignee(""); setFilterSearch(""); setMyTasksOnly(false); }}
               className="btn-ghost btn-sm text-xs rounded-lg hover:bg-red-50 hover:text-red-600 transition-colors">Clear</button>
           )}
         </div>
@@ -373,12 +395,29 @@ export default function IssuesPage() {
       {/* Insights (collapsible) */}
       {showInsights && issues.length > 0 && (
         <div className="flex-shrink-0 px-4 sm:px-6 py-4 border-b border-border-subtle bg-surface animate-fade-in space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <StatCard label="Total Tasks" value={total} icon={<TasksIcon />} />
             <StatCard label="Team Members" value={members.length} icon={<UserIcon />} />
             <StatCard label="Active" value={statsByState.started || 0} sub="In Progress" icon={<ChartIcon />} color={chartColors.amber} />
-            <StatCard label="Completed" value={statsByState.completed || 0} sub="Done this sprint" icon={<CheckIcon size={18} />} color={chartColors.emerald} />
+            <StatCard label="Completed" value={statsByState.completed || 0} sub="Done" icon={<CheckIcon size={18} />} color={chartColors.emerald} />
+            <StatCard label="Overdue" value={overdueCount} sub={overdueCount > 0 ? "Needs attention" : "On track"} icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>} color={overdueCount > 0 ? chartColors.red : chartColors.emerald} />
           </div>
+
+          {/* Completion rate progress bar */}
+          <div className="card p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-text-primary">Completion Rate</span>
+              <span className="text-sm font-bold text-primary">{completionRate}%</span>
+            </div>
+            <div className="h-2.5 rounded-full bg-surface-2 overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500 transition-all duration-500" style={{ width: `${completionRate}%` }} />
+            </div>
+            <div className="flex items-center justify-between mt-2 text-[10px] text-text-tertiary">
+              <span>{completedCount} completed</span>
+              <span>{total - completedCount} remaining</span>
+            </div>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             {priorityChartData.length > 0 && (
               <ChartCard title="Priority Distribution">
@@ -387,7 +426,7 @@ export default function IssuesPage() {
             )}
             {stateChartData.length > 0 && (
               <ChartCard title="State Breakdown">
-                <BarChart data={stateChartData} xKey="name" yKey="count" color={chartColors.primary} height={180} barSize={36} />
+                <ColoredBarChart data={stateChartData} xKey="name" yKey="count" colorMap={STATE_COLORS} height={180} barSize={36} />
               </ChartCard>
             )}
           </div>
