@@ -63,9 +63,11 @@ export async function api<T = unknown>(path: string, opts: ApiOptions = {}): Pro
   }
 
   try {
+    const token = getToken();
     const res = await fetch(path, {
       method: opts.method ?? "GET",
       headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(opts.body !== undefined ? { "Content-Type": "application/json" } : {}),
       },
       credentials: "same-origin",

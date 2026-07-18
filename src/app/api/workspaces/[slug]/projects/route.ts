@@ -16,8 +16,7 @@ const DEF_STATES = [
   { group: "cancelled", name: "Cancelled", color: "#dc2626", seq: 75000 },
 ];
 
-// Managers see every project in the workspace. Plain members only see the
-// projects they've been explicitly added to (project_members).
+// All workspace members see every project in the workspace.
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   try {
     const user = await getUser(req);
@@ -29,12 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     if (!access) return err("Access denied", 403);
     const wsId = access.workspace.id;
     const { data } = await getAdmin().from("projects").select("*").eq("workspace_id", wsId).order("name", { ascending: true });
-    let visibleProjects = data || [];
-    if (!access.isManager) {
-      const { data: myProjects } = await getAdmin().from("project_members").select("project_id").eq("user_id", user.id);
-      const allowed = new Set((myProjects || []).map((p: any) => p.project_id));
-      visibleProjects = visibleProjects.filter((p: any) => allowed.has(p.id));
-    }
+    const visibleProjects = data || [];
 
     const projectIds = visibleProjects.map((p: any) => p.id);
     if (!projectIds.length) return ok([]);

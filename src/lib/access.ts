@@ -72,9 +72,10 @@ export interface ProjectAccess {
   isManager: boolean;
 }
 
-/** Resolve a project's workspace and assert the user can work in it: workspace
- *  managers/the owner always can; other workspace members need an explicit
- *  project_members row. Returns null if the user has no access at all. */
+/** Resolve a project's workspace and assert the user is a member of it.
+ *  All workspace members can access any project in the workspace; isManager
+ *  distinguishes managers/owners (who can rename, delete, manage members)
+ *  from regular members. Returns null if the user has no access at all. */
 export async function getProjectAccess(projectId: string, userId: string): Promise<ProjectAccess | null> {
   const { data: project } = await getAdmin()
     .from("projects")
@@ -100,16 +101,7 @@ export async function getProjectAccess(projectId: string, userId: string): Promi
   if (!membership && !isOwner) return null;
 
   const manager = isManager({ isOwner, role: membership?.role ?? null });
-  if (manager) return { workspaceId: workspace.id, isManager: true };
-
-  const { data: projectMembership } = await getAdmin()
-    .from("project_members")
-    .select("user_id")
-    .eq("project_id", projectId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!projectMembership) return null;
-  return { workspaceId: workspace.id, isManager: false };
+  return { workspaceId: workspace.id, isManager: manager };
 }
 
 const DEFAULT_STATES = [
