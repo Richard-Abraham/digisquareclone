@@ -77,9 +77,15 @@ export default function IssuesPage() {
       const proj = await api<{ id: string; name: string }[]>(`/api/workspaces/${slug}/projects`);
       if (!proj.length) { setLoading(false); return; }
       setProjects(proj);
+      const requestedPid = new URLSearchParams(window.location.search).get("proj");
       const lastPid = localStorage.getItem(`lastProject:${slug}`);
-      const pid = (lastPid && proj.some((p) => p.id === lastPid)) ? lastPid : proj[0].id;
+      const pid = requestedPid && proj.some((p) => p.id === requestedPid)
+        ? requestedPid
+        : lastPid && proj.some((p) => p.id === lastPid)
+          ? lastPid
+          : proj[0].id;
       setProjId(pid);
+      localStorage.setItem(`lastProject:${slug}`, pid);
       await Promise.all([
         api<{ members: { user_id: string; profile: { display_name: string } | null }[] }>(`/api/workspaces/${slug}/members`).then(r => setMembers(r.members.map((m: any) => ({ user_id: m.user_id, profile: m.profile })))),
         api<State[]>(`/api/workspaces/${slug}/projects/${pid}/states`).then(setStates),
@@ -89,10 +95,14 @@ export default function IssuesPage() {
   }
 
   async function selectProject(pid: string, slug = wsSlug) {
-    setProjId(pid); setPage(1);
+    setProjId(pid); setPage(1); setLoadError(null); setLoading(true);
     localStorage.setItem(`lastProject:${slug}`, pid);
-    try { setStates(await api<State[]>(`/api/workspaces/${slug}/projects/${pid}/states`)); } catch {}
-    await loadIssues(slug, pid);
+    const url = new URL(window.location.href);
+    url.searchParams.set("proj", pid);
+    window.history.replaceState({}, "", url);
+    try { setStates(await api<State[]>(`/api/workspaces/${slug}/projects/${pid}/states`)); }
+    catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load project states"); }
+    await loadIssues(slug, pid, 1);
   }
 
   async function createProject() {
@@ -293,42 +303,6 @@ export default function IssuesPage() {
     </div>
   );
 
-  if (!loading && issues.length === 0 && wsSlug && projects.length > 0) return (
-    <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 border-b border-border-subtle bg-surface-1 px-4 sm:px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-bold text-text-primary font-display tracking-tight">Board</h1>
-            <p className="text-[11px] text-text-tertiary mt-0.5">No tasks yet</p>
-          </div>
-          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-            <Plus size={14} strokeWidth={2.5} />
-            New Task
-          </Button>
-        </div>
-      </div>
-      <div className="empty-state flex-1">
-        <div className="empty-state-icon"><TasksIcon /></div>
-        <p className="empty-state-title">No tasks in this project</p>
-        <p className="empty-state-desc">Create your first task to get started with the board.</p>
-        <Button variant="primary" size="sm" onClick={() => setShowCreate(true)} className="mt-4">Create a task</Button>
-      </div>
-      <CreateTaskDrawer
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
-        wsSlug={wsSlug}
-        projId={projId}
-        members={members}
-        onCreated={() => {
-          setShowCreate(false);
-          setPage(1);
-          loadIssues(undefined, undefined, 1);
-          toast.success("Task created");
-        }}
-      />
-    </div>
-  );
-
   const activeFilterCount = [filterState, filterPriority, filterAssignee, filterSearch, myTasksOnly].filter(Boolean).length;
 
   return (
@@ -410,7 +384,7 @@ export default function IssuesPage() {
       </div>
 
       {/* Insights (collapsible) */}
-      {showInsights && issues.length > 0 && (
+      {showInsights && (
         <div className="flex-shrink-0 px-4 sm:px-6 py-4 border-b border-border-subtle bg-surface animate-fade-in space-y-4">
           {/* Overview stats */}
           <div>
@@ -442,18 +416,25 @@ export default function IssuesPage() {
           {/* Distribution charts */}
           <div>
             <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-2.5">Distribution</h3>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {priorityChartData.length > 0 && (
-                <ChartCard title="Priority Distribution">
-                  <DonutChart data={priorityChartData} dataKey="count" nameKey="name" colors={[chartColors.red, chartColors.amber, chartColors.primary, chartColors.slate, "#CBD5E1"]} height={200} innerRadius={40} outerRadius={70} />
-                </ChartCard>
-              )}
-              {stateChartData.length > 0 && (
-                <ChartCard title="State Breakdown">
-                  <ColoredBarChart data={stateChartData} xKey="name" yKey="count" colorMap={STATE_COLORS} height={180} barSize={36} />
-                </ChartCard>
-              )}
-            </div>
+            {issues.length > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {priorityChartData.length > 0 && (
+                  <ChartCard title="Priority Distribution">
+                    <DonutChart data={priorityChartData} dataKey="count" nameKey="name" colors={[chartColors.red, chartColors.amber, chartColors.primary, chartColors.slate, "#CBD5E1"]} height={200} innerRadius={40} outerRadius={70} />
+                  </ChartCard>
+                )}
+                {stateChartData.length > 0 && (
+                  <ChartCard title="State Breakdown">
+                    <ColoredBarChart data={stateChartData} xKey="name" yKey="count" colorMap={STATE_COLORS} height={180} barSize={36} />
+                  </ChartCard>
+                )}
+              </div>
+            ) : (
+              <div className="card p-6 text-center">
+                <p className="text-sm font-semibold text-text-primary">No task data to chart yet</p>
+                <p className="text-xs text-text-tertiary mt-1">Create a task in this project and its distribution will appear here.</p>
+              </div>
+            )}
           </div>
         </div>
       )}

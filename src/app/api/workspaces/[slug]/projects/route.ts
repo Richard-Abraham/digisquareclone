@@ -6,6 +6,7 @@ import { deriveIdentifier } from "@/lib/tasks";
 import { ensureUniqueIdentifier, getWorkspaceAccess } from "@/lib/access";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { resolveProfiles } from "@/lib/profiles";
 
 const DEF_STATES = [
   { group: "backlog", name: "Backlog", color: "#a3a3a3", seq: 15000 },
@@ -28,10 +29,57 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     if (!access) return err("Access denied", 403);
     const wsId = access.workspace.id;
     const { data } = await getAdmin().from("projects").select("*").eq("workspace_id", wsId).order("created_at", { ascending: false });
-    if (access.isManager) return ok(data || []);
-    const { data: pm } = await getAdmin().from("project_members").select("project_id").eq("user_id", user.id);
-    const allowed = new Set((pm || []).map((p: any) => p.project_id));
-    return ok((data || []).filter((p: any) => allowed.has(p.id)));
+    let visibleProjects = data || [];
+    if (!access.isManager) {
+      const { data: myProjects } = await getAdmin().from("project_members").select("project_id").eq("user_id", user.id);
+      const allowed = new Set((myProjects || []).map((p: any) => p.project_id));
+      visibleProjects = visibleProjects.filter((p: any) => allowed.has(p.id));
+    }
+
+    const projectIds = visibleProjects.map((p: any) => p.id);
+    if (!projectIds.length) return ok([]);
+
+    const [{ data: states }, { data: issues }, { data: projectMembers }] = await Promise.all([
+      getAdmin().from("states").select("id, project_id, group_name").in("project_id", projectIds),
+      getAdmin().from("issues").select("project_id, state_id, created_at").in("project_id", projectIds).is("archived_at", null).eq("is_draft", false),
+      getAdmin().from("project_members").select("project_id, user_id").in("project_id", projectIds),
+    ]);
+
+    const stateGroups = new Map((states || []).map((state: any) => [state.id, state.group_name]));
+    const metrics = new Map<string, { total: number; completed: number; groups: Record<string, number>; lastActivity: string | null }>();
+    for (const issue of issues || []) {
+      const current = metrics.get(issue.project_id) || { total: 0, completed: 0, groups: {}, lastActivity: null };
+      const group = stateGroups.get(issue.state_id) || "backlog";
+      current.total += 1;
+      current.groups[group] = (current.groups[group] || 0) + 1;
+      if (group === "completed") current.completed += 1;
+      if (!current.lastActivity || issue.created_at > current.lastActivity) current.lastActivity = issue.created_at;
+      metrics.set(issue.project_id, current);
+    }
+
+    const memberIds = Array.from(new Set((projectMembers || []).map((member: any) => member.user_id)));
+    const profiles = await resolveProfiles(memberIds);
+    const membersByProject = new Map<string, { user_id: string; display_name: string; avatar_url: string | null }[]>();
+    for (const member of projectMembers || []) {
+      const profile = profiles.get(member.user_id);
+      const list = membersByProject.get(member.project_id) || [];
+      list.push(profile || { user_id: member.user_id, display_name: "Team member", avatar_url: null });
+      membersByProject.set(member.project_id, list);
+    }
+
+    return ok(visibleProjects.map((project: any) => {
+      const projectMetrics = metrics.get(project.id) || { total: 0, completed: 0, groups: {}, lastActivity: null };
+      const members = membersByProject.get(project.id) || [];
+      return {
+        ...project,
+        task_count: projectMetrics.total,
+        completed_count: projectMetrics.completed,
+        state_groups: projectMetrics.groups,
+        last_activity_at: projectMetrics.lastActivity || project.created_at || null,
+        member_count: members.length,
+        member_preview: members.slice(0, 4),
+      };
+    }));
   } catch (e) {
     logger.error("GET /api/workspaces/[slug]/projects failed", e);
     return err("Internal server error", { status: 500 });

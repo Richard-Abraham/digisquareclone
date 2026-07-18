@@ -17,7 +17,7 @@ export default function AnalyticsPage() {
   const [overview, setOverview] = useState<any>(null);
   const [workItems, setWorkItems] = useState<any>(null);
   const [projectAnalytics, setProjectAnalytics] = useState<any>(null);
-  const [selectedProject, setSelectedProject] = useState("");
+  const [selectedProject, setSelectedProject] = useState(() => typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("proj") || "");
   const [loading, setLoading] = useState(true);
 
   const loadAnalytics = useCallback(async () => {
@@ -62,7 +62,14 @@ export default function AnalyticsPage() {
         </div>
         <div className="flex gap-2 flex-wrap">
           {projects && projects.length > 0 && (
-            <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className="select text-xs w-auto" aria-label="Select project">
+            <select value={selectedProject} onChange={(e) => {
+              const projectId = e.target.value;
+              setSelectedProject(projectId);
+              const url = new URL(window.location.href);
+              if (projectId) url.searchParams.set("proj", projectId);
+              else url.searchParams.delete("proj");
+              window.history.replaceState({}, "", url);
+            }} className="select text-xs w-auto" aria-label="Select project">
               <option value="">All projects</option>
               {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>

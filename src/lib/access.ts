@@ -74,31 +74,42 @@ export interface ProjectAccess {
 
 /** Resolve a project's workspace and assert the user can work in it: workspace
  *  managers/the owner always can; other workspace members need an explicit
- *  project_members row. Returns null if the user has no access at all.
- *  Uses an embedded join to fetch project + workspace in one query (was 3-4). */
+ *  project_members row. Returns null if the user has no access at all. */
 export async function getProjectAccess(projectId: string, userId: string): Promise<ProjectAccess | null> {
-  // 1 query: project + its workspace via embedded select.
-  const { data: proj } = await getAdmin()
+  const { data: project } = await getAdmin()
     .from("projects")
-    .select("id, workspace_id, workspace:workspaces(id, owner_id)")
+    .select("id, workspace_id")
     .eq("id", projectId)
-    .single() as any;
-  if (!proj) return null;
-  const ws = Array.isArray(proj.workspace) ? proj.workspace[0] : proj.workspace;
-  if (!ws) return null;
+    .maybeSingle();
+  if (!project) return null;
 
-  // 2nd query: workspace membership for this user.
-  const { data: m } = await getAdmin()
-    .from("workspace_members").select("role").eq("workspace_id", ws.id).eq("user_id", userId).single();
-  const isOwner = ws.owner_id === userId;
-  if (!m && !isOwner) return null;
-  const manager = isManager({ isOwner, role: m?.role ?? null });
-  if (manager) return { workspaceId: ws.id, isManager: true };
+  const { data: workspace } = await getAdmin()
+    .from("workspaces")
+    .select("id, owner_id")
+    .eq("id", project.workspace_id)
+    .maybeSingle();
+  if (!workspace) return null;
 
-  // 3rd query (only for non-managers): project membership.
-  const { data: pm } = await getAdmin().from("project_members").select("user_id").eq("project_id", projectId).eq("user_id", userId).maybeSingle();
-  if (!pm) return null;
-  return { workspaceId: ws.id, isManager: false };
+  const { data: membership } = await getAdmin()
+    .from("workspace_members")
+    .select("role")
+    .eq("workspace_id", workspace.id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  const isOwner = workspace.owner_id === userId;
+  if (!membership && !isOwner) return null;
+
+  const manager = isManager({ isOwner, role: membership?.role ?? null });
+  if (manager) return { workspaceId: workspace.id, isManager: true };
+
+  const { data: projectMembership } = await getAdmin()
+    .from("project_members")
+    .select("user_id")
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!projectMembership) return null;
+  return { workspaceId: workspace.id, isManager: false };
 }
 
 const DEFAULT_STATES = [
