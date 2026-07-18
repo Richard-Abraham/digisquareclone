@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/providers";
 import { clearToken } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useUnreadCount } from "@/lib/hooks";
 import { useKeyboardShortcuts } from "@/lib/keyboard";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -18,12 +19,18 @@ import {
 interface NavItem { href: string; icon: React.ReactNode; label: string; pattern: (p: string) => boolean; badge?: number }
 interface NavGroup { label: string; items: NavItem[] }
 
+interface NotifItem { id: string; kind: string; created_at: string; read: boolean; issue?: { id: string; name: string } | null; workspace?: { slug: string } | null }
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, ready } = useAuth();
   const [unread, setUnread] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifs, setNotifs] = useState<NotifItem[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -44,6 +51,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Close sidebar on navigation
   useEffect(() => { setSidebarOpen(false); }, [pathname]);
+
+  // Close notif dropdown on outside click
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+    }
+    if (notifOpen) document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [notifOpen]);
+
+  // Fetch recent notifications when dropdown opens
+  useEffect(() => {
+    if (!notifOpen || !user) return;
+    setNotifLoading(true);
+    api<{ items: NotifItem[] }>("/api/notifications?pageSize=5")
+      .then(r => setNotifs(r.items || []))
+      .catch(() => {})
+      .finally(() => setNotifLoading(false));
+  }, [notifOpen, user]);
 
   const { data: unreadCount } = useUnreadCount(!!user);
   useEffect(() => { if (unreadCount !== undefined) setUnread(unreadCount); }, [unreadCount]);
@@ -115,6 +141,68 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="space-y-1">
                 {group.items.map((item) => {
                   const active = item.pattern(pathname);
+                  if (item.label === "Notifications") {
+                    return (
+                      <div key={item.href} className="relative" ref={notifRef}>
+                        <button
+                          onClick={() => setNotifOpen(v => !v)}
+                          className={`group relative w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
+                            ${active
+                              ? "bg-gradient-to-r from-primary-50 to-primary-50/40 text-primary shadow-sm dark:from-primary-500/15 dark:to-primary-500/5 dark:text-primary-300"
+                              : "text-text-secondary hover:bg-surface-2 hover:text-text-primary hover:translate-x-0.5"
+                            }`}>
+                          {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-primary" />}
+                          <span className={`flex-shrink-0 transition-colors ${active ? "text-primary" : "text-text-tertiary group-hover:text-text-secondary"}`}>
+                            {item.icon}
+                          </span>
+                          <span className="flex-1 text-left">{item.label}</span>
+                          {item.badge !== undefined && item.badge > 0 && (
+                            <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm animate-pulse-soft">
+                              {item.badge > 99 ? "99+" : item.badge}
+                            </span>
+                          )}
+                        </button>
+                        {notifOpen && (
+                          <div className="absolute left-full top-0 ml-2 w-80 bg-surface-1 rounded-xl border border-border shadow-elevated z-50 overflow-hidden animate-slide-in-right">
+                            <div className="px-4 py-3 border-b border-border-subtle flex items-center justify-between">
+                              <span className="text-sm font-bold text-text-primary">Notifications</span>
+                              {unread > 0 && <span className="text-[10px] text-text-tertiary">{unread} unread</span>}
+                            </div>
+                            <div className="max-h-80 overflow-y-auto">
+                              {notifLoading ? (
+                                <div className="flex items-center justify-center py-8">
+                                  <SpinnerIcon size={20} className="animate-spin text-primary" />
+                                </div>
+                              ) : notifs.length > 0 ? (
+                                notifs.map((n) => (
+                                  <Link
+                                    key={n.id}
+                                    href={n.issue && n.workspace ? `/dashboard/issues/${n.issue.id}?ws=${n.workspace.slug}` : "/dashboard/notifications"}
+                                    onClick={() => setNotifOpen(false)}
+                                    className={`block px-4 py-3 border-b border-border-subtle last:border-0 hover:bg-surface-2 transition-colors ${!n.read ? "bg-primary-50/40" : ""}`}
+                                  >
+                                    <div className="flex items-start gap-2">
+                                      {!n.read && <span className="size-2 rounded-full bg-primary flex-shrink-0 mt-1.5" />}
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm text-text-primary truncate">{n.issue?.name || n.kind.replace(/_/g, " ")}</p>
+                                        <p className="text-[10px] text-text-tertiary mt-0.5">{new Date(n.created_at).toLocaleString()}</p>
+                                      </div>
+                                    </div>
+                                  </Link>
+                                ))
+                              ) : (
+                                <p className="text-sm text-text-tertiary text-center py-8">No notifications</p>
+                              )}
+                            </div>
+                            <Link href="/dashboard/notifications" onClick={() => setNotifOpen(false)}
+                              className="block text-center py-2.5 text-xs font-medium text-primary hover:bg-primary-50 transition-colors border-t border-border-subtle">
+                              View all notifications
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
                   return (
                     <Link key={item.href} href={item.href}
                       className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200

@@ -8,6 +8,7 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useAuth } from "@/lib/providers";
 import { api } from "@/lib/api";
+import { toast } from "sonner";
 import { deriveIdentifier } from "@/lib/tasks";
 import { useRealtimeIssues } from "@/lib/realtime";
 import { TasksIcon, SpinnerIcon, UserIcon, ChartIcon, CheckIcon } from "@/components/icons";
@@ -233,12 +234,14 @@ export default function IssuesPage() {
         await api(`/api/workspaces/${wsSlug}/projects/${projId}/issues/${movedId}`, {
           method: "PATCH", body: { state_id: targetState.id },
         });
+        toast.success(`Moved to ${targetState.name}`);
       }
       await api(`/api/workspaces/${wsSlug}/projects/${projId}/issues/reorder`, {
         method: "PATCH", body: { items: newOrder },
       });
     } catch {
       setIssues(prevIssues); // rollback (re-derives columns)
+      toast.error("Failed to move task — reverted");
     }
   }
 
@@ -260,6 +263,42 @@ export default function IssuesPage() {
       <div className="empty-state-icon"><TasksIcon /></div>
       <p className="empty-state-title">No project access yet</p>
       <p className="empty-state-desc">A manager needs to add you to a project before you can see its board.</p>
+    </div>
+  );
+
+  if (!loading && issues.length === 0 && wsSlug && projects.length > 0) return (
+    <div className="flex flex-col h-full">
+      <div className="flex-shrink-0 border-b border-border-subtle bg-surface-1 px-4 sm:px-6 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-lg font-bold text-text-primary font-display tracking-tight">Board</h1>
+            <p className="text-[11px] text-text-tertiary mt-0.5">No tasks yet</p>
+          </div>
+          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+            New Task
+          </Button>
+        </div>
+      </div>
+      <div className="empty-state flex-1">
+        <div className="empty-state-icon"><TasksIcon /></div>
+        <p className="empty-state-title">No tasks in this project</p>
+        <p className="empty-state-desc">Create your first task to get started with the board.</p>
+        <Button variant="primary" size="sm" onClick={() => setShowCreate(true)} className="mt-4">Create a task</Button>
+      </div>
+      <CreateTaskDrawer
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        wsSlug={wsSlug}
+        projId={projId}
+        members={members}
+        onCreated={() => {
+          setShowCreate(false);
+          setPage(1);
+          loadIssues(undefined, undefined, 1);
+          toast.success("Task created");
+        }}
+      />
     </div>
   );
 
@@ -439,6 +478,7 @@ export default function IssuesPage() {
           setShowCreate(false);
           setPage(1);
           loadIssues(undefined, undefined, 1);
+          toast.success("Task created");
         }}
       />
 
