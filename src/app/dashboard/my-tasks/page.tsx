@@ -33,12 +33,30 @@ const VIEWS = [
   { key: "done", label: "Done" },
 ];
 
-function formatDue(dateStr: string): { label: string; overdue: boolean } {
+const SORTS = [
+  { key: "updated", label: "Last Updated" },
+  { key: "due", label: "Due Date" },
+  { key: "priority", label: "Priority" },
+  { key: "project", label: "Project" },
+];
+
+const PRIORITY_ORDER: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 };
+
+function formatDue(dateStr: string): { label: string; overdue: boolean; daysUntil: number } {
   const d = new Date(dateStr + "T00:00:00");
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return { label: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }), overdue: d < today };
+  const diffMs = d.getTime() - today.getTime();
+  const daysUntil = Math.round(diffMs / 86400000);
+  return { label: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }), overdue: d < today, daysUntil };
 }
+
+const EMPTY_MESSAGES: Record<string, { title: string; description: string }> = {
+  all: { title: "Nothing here", description: "No active tasks. You're all caught up!" },
+  review: { title: "No reviews pending", description: "No tasks are awaiting your review right now." },
+  bugs: { title: "No bugs assigned", description: "No bugs are assigned to you. Great work!" },
+  done: { title: "Nothing completed yet", description: "Completed tasks will appear here once you finish them." },
+};
 
 export default function MyTasksPage() {
   const { data: ws, isLoading: wsLoading } = useWorkspace();
@@ -46,6 +64,8 @@ export default function MyTasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("updated");
 
   useEffect(() => {
     if (!ws?.slug) return;
@@ -73,28 +93,87 @@ export default function MyTasksPage() {
     return { total: tasks.length, overdue, bugs, inProgress, done };
   }, [tasks]);
 
+  // Filter by search + sort
+  const filteredTasks = useMemo(() => {
+    let result = tasks;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(t => t.name.toLowerCase().includes(q) || t.project?.name?.toLowerCase().includes(q) || String(t.sequence_id).includes(q));
+    }
+    const sorted = [...result];
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case "due": {
+          const aD = a.target_date ? new Date(a.target_date).getTime() : Infinity;
+          const bD = b.target_date ? new Date(b.target_date).getTime() : Infinity;
+          return aD - bD;
+        }
+        case "priority":
+          return (PRIORITY_ORDER[a.priority] ?? 4) - (PRIORITY_ORDER[b.priority] ?? 4);
+        case "project":
+          return (a.project?.name || "").localeCompare(b.project?.name || "");
+        default:
+          return 0; // 'updated' — API already returns in sort_order
+      }
+    });
+    return sorted;
+  }, [tasks, search, sortBy]);
+
   // Group by project
   const grouped = useMemo(() => {
     const map = new Map<string, { projectName: string; tasks: Task[] }>();
-    for (const t of tasks) {
+    for (const t of filteredTasks) {
       const key = t.project?.id || "no-project";
       const entry = map.get(key) || { projectName: t.project?.name || "Unassigned", tasks: [] };
       entry.tasks.push(t);
       map.set(key, entry);
     }
     return Array.from(map.values());
-  }, [tasks]);
+  }, [filteredTasks]);
 
   if (wsLoading || loading) return <Spinner label="Loading your tasks..." />;
   if (error) return <ErrorState message={error} onRetry={() => setView(view)} />;
 
+  const emptyMsg = EMPTY_MESSAGES[view] || EMPTY_MESSAGES.all;
+
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-lg font-bold text-text-primary font-display tracking-tight">My Tasks</h1>
-        <p className="text-[11px] text-text-tertiary mt-0.5">Tasks where you&apos;re an assignee or reviewer</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="hidden sm:flex size-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 shadow-sm items-center justify-center flex-shrink-0 text-white">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold text-text-primary font-display tracking-tight">My Tasks</h1>
+            <p className="text-sm text-text-tertiary mt-0.5">Tasks where you're an assignee or reviewer</p>
+          </div>
+        </div>
+        {/* Search + Sort */}
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+          <div className="relative">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" />
+            </svg>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
+              className="input-sm !pl-8 w-[180px] rounded-lg" aria-label="Search tasks" />
+          </div>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="select text-xs !w-auto min-w-[130px] !py-1.5 rounded-lg" aria-label="Sort tasks">
+            {SORTS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+        </div>
       </div>
+
+      {/* Overdue alert banner */}
+      {stats.overdue > 0 && view !== "done" && (
+        <div className="flex items-center gap-2.5 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 px-4 py-3 mb-5 animate-fade-in">
+          <span className="size-2 rounded-full bg-red-500 animate-pulse-soft flex-shrink-0" />
+          <p className="text-sm font-medium text-red-700 dark:text-red-400">
+            {stats.overdue} task{stats.overdue === 1 ? "" : "s"} overdue — needs your attention
+          </p>
+          <button onClick={() => setSortBy("due")} className="ml-auto text-xs font-bold text-red-600 dark:text-red-400 hover:underline">Sort by due date</button>
+        </div>
+      )}
 
       {/* Stat cards */}
       {tasks.length > 0 && (
@@ -111,11 +190,11 @@ export default function MyTasksPage() {
         <Tabs items={VIEWS} value={view} onChange={setView} />
       </div>
 
-      {tasks.length === 0 ? (
+      {filteredTasks.length === 0 ? (
         <EmptyState
           icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>}
-          title="Nothing here"
-          description="No tasks match this view. Try a different filter or check back later."
+          title={search.trim() ? "No matches" : emptyMsg.title}
+          description={search.trim() ? "Try a different search term." : emptyMsg.description}
         />
       ) : (
         <div className="space-y-6 animate-fade-in">
@@ -138,6 +217,7 @@ export default function MyTasksPage() {
                   const prio = PRIO_META[t.priority] || PRIO_META.none;
                   const due = t.target_date ? formatDue(t.target_date) : null;
                   const subPct = t.subtask_total ? Math.round((t.subtask_done / t.subtask_total) * 100) : 0;
+                  const subColor = subPct >= 70 ? "#10B981" : subPct >= 30 ? "#F59E0B" : "#EF4444";
                   return (
                     <Link
                       key={t.id}
@@ -157,25 +237,27 @@ export default function MyTasksPage() {
                       </div>
 
                       {/* Bottom row: state, due date, subtask progress */}
-                      <div className="flex flex-wrap items-center gap-3 pl-13">
+                      <div className="flex flex-wrap items-center gap-3 ml-12">
                         {t.state && (
-                          <span className="text-[10px] font-medium flex items-center gap-1 flex-shrink-0">
+                          <span className="text-[10px] font-semibold flex items-center gap-1 flex-shrink-0 px-1.5 py-0.5 rounded" style={{ backgroundColor: `${t.state.color}15`, color: t.state.color }}>
                             <span className="size-1.5 rounded-full" style={{ backgroundColor: t.state.color }} />
                             {t.state.name}
                           </span>
                         )}
                         {due && (
                           <span className={clsx("inline-flex items-center gap-1 text-[10px] font-medium flex-shrink-0", due.overdue ? "text-red-500" : "text-text-tertiary")}>
+                            {due.overdue && <span className="size-1.5 rounded-full bg-red-500 animate-pulse-soft" />}
                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" />
                             </svg>
-                            {due.label}{due.overdue ? " · overdue" : ""}
+                            {due.label}
+                            {due.overdue ? ` · ${Math.abs(due.daysUntil)}d overdue` : due.daysUntil === 0 ? " · today" : due.daysUntil <= 3 ? ` · ${due.daysUntil}d left` : ""}
                           </span>
                         )}
                         {t.subtask_total > 0 && (
                           <div className="flex items-center gap-1.5 flex-shrink-0">
                             <div className="w-16 h-1 rounded-full bg-surface-2 overflow-hidden">
-                              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${subPct}%` }} />
+                              <div className="h-full rounded-full transition-all" style={{ width: `${subPct}%`, backgroundColor: subColor }} />
                             </div>
                             <span className="text-[10px] text-text-tertiary font-medium">{t.subtask_done}/{t.subtask_total}</span>
                           </div>
