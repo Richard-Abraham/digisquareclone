@@ -15,7 +15,7 @@ import { logger } from "@/lib/logger";
 import {
   TasksIcon, UserIcon, CalendarIcon, BellIcon, UsersIcon, ChartIcon, FolderIcon,
 } from "@/components/icons";
-import { X, BellOff, LogOut, Menu } from "lucide-react";
+import { X, BellOff, LogOut, Menu, ClipboardList } from "lucide-react";
 
 const SHORTCUTS: Record<string, string> = {
   Board: "N",
@@ -34,6 +34,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, profile, ready } = useAuth();
   const [unread, setUnread] = useState(0);
   const [workspaceName, setWorkspaceName] = useState("");
+  const [workspaceOwnerId, setWorkspaceOwnerId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -86,7 +87,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!user) return;
-    api<{ name: string }[]>("/api/workspaces").then(ws => { if (ws.length > 0) setWorkspaceName(ws[0].name); }).catch(() => {});
+    api<{ name: string; owner_id: string }[]>("/api/workspaces").then(ws => { if (ws.length > 0) { setWorkspaceName(ws[0].name); setWorkspaceOwnerId(ws[0].owner_id); } }).catch(() => {});
   }, [user]);
 
   if (!user || !ready) return (
@@ -110,7 +111,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     {
       label: "Daily",
       items: [
-        { href: "/dashboard/standup", label: "Standup", icon: <CalendarIcon />, pattern: (p) => p.startsWith("/dashboard/standup") },
+        { href: "/dashboard/standup", label: "Standup", icon: <CalendarIcon />, pattern: (p) => p === "/dashboard/standup" },
+        ...(user && workspaceOwnerId === user.id
+          ? [{ href: "/dashboard/standups", label: "All Standups", icon: <ClipboardList size={18} strokeWidth={1.8} />, pattern: (p: string) => p.startsWith("/dashboard/standups") }]
+          : []),
         { href: "/dashboard/notifications", label: "Notifications", icon: <BellIcon />, pattern: (p) => p.startsWith("/dashboard/notifications"), badge: unread },
       ],
     },
