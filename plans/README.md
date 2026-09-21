@@ -68,6 +68,41 @@ Two corrections to the plan's own instructions, learned during execution:
   was wrong: `issues/route.ts:63` is the issue-title substring search and must keep its
   `%…%` wildcards. The executor correctly refused to comply and flagged it.
 
+## 004 / 005 — execution record (2026-09-21)
+
+Both executed in isolated worktrees, reviewed, merged. Gates on merged main:
+`npx tsc --noEmit` exit 0, `npm test` 103 passed. No dependency added by either.
+Migration `0013_credentials_vault.sql` applied and recorded; 005 needed none.
+
+**004 — verified by reading the code, not the report**: `file_path` is never selected in
+the list query (so it cannot leak rather than being stripped afterwards); non-managers are
+filtered to their explicit grants and get an empty list when they have none; upload is
+managers-only with rollback of its placeholder row when the storage upload fails; the
+download route checks `canRead`, returns the signed URL as JSON and writes an audit row;
+the grant route verifies workspace membership — including the owner-without-a-members-row
+case; the `storagePath` traversal assertion is present.
+
+One review finding, fixed in `032feb2`: `client_id` was accepted on upload without checking
+it belonged to the workspace. Not an exposure — nothing joins `clients` in the list query —
+but plan 003 had already set the right pattern. The executor also found `client_id` in the
+PATCH allowlist and guarded that too, while still permitting a clear-to-null.
+
+**Unverified and owed to a human**: the `credentials` bucket's privacy. The migration ran
+without error, but `insert into storage.buckets` can affect zero rows silently if the
+migration role is not permitted to write that table, and nothing here can read it back.
+**Confirm in the Supabase dashboard that the `credentials` bucket exists and reads
+Private before anyone uploads a real credential.** Also unverified: the whole upload /
+grant / revoke / non-manager-visibility flow, which needs a running app.
+
+**005 — verified**: `canViewAllStandups` (not `isManager`), the
+`canViewAll ? requested : own` override intact, both the JSON and CSV routes funnelling
+through one `buildStandupReport` so they cannot drift, and `parseEntries` used rather than
+raw `plan`/`report` so older storage formats render as text instead of JSON. The print
+rules were appended after the driver.js tour block, not into it.
+
+**Unverified and owed to a human**: the print preview itself — no navigation or filter bar,
+white ground, a page break per person, selectable text in the saved PDF. No browser here.
+
 ## 007 — execution record (2026-09-21)
 
 Executed, reviewed, merged. `npx tsc --noEmit` exit 0, `npm test` 70 passed. Migration
