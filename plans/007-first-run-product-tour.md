@@ -7,10 +7,17 @@
 > in `plans/README.md` unless a reviewer told you they maintain the index.
 >
 > **Drift check (run first)**:
-> `git diff --stat e50af2b..HEAD -- src/app/dashboard src/components src/lib supabase/migrations`
+> `git diff --stat 70852af..HEAD -- src/app/dashboard src/components src/lib supabase/migrations`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Expected, not drift**: `src/app/dashboard/page.tsx` was rewritten by plan 006 (its
+> `loadAll()` now makes one request to `/api/dashboard/init`). This plan only adds
+> `data-tour` attributes to that file and quotes nothing from it, so that change is
+> harmless. Every file this plan DOES quote — `src/app/api/auth/me/route.ts`,
+> `src/app/dashboard/layout.tsx`, `src/components/ui/HelpModal.tsx`,
+> `src/lib/providers.tsx` and `supabase/migrations/` — is unchanged at `70852af`.
 
 ## Status
 
@@ -22,7 +29,8 @@
   Execute 006 first and merge it, or expect conflicts. Nothing in this plan's logic depends
   on 006.
 - **Category**: direction (new feature)
-- **Planned at**: commit `e50af2b`, 2026-09-21
+- **Planned at**: commit `70852af`, 2026-09-21 (re-stamped from `e50af2b` after plan 006
+  merged; every "Current state" excerpt below was re-verified unchanged at `70852af`)
 
 ## Why this matters
 
