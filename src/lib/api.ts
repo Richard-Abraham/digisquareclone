@@ -4,7 +4,10 @@
 // R4: Added timeout via AbortController (10s default).
 // P7: Supports an external AbortSignal for cancellation on unmount.
 
-const DEFAULT_TIMEOUT = 10_000;
+// 30s: a cold Netlify Function chain can exceed 10s, and aborting a slow-but-working
+// request is worse than waiting — the user sees an error instead of their data.
+// Callers that want to fail faster can pass `timeout` per call.
+const DEFAULT_TIMEOUT = 30_000;
 
 export function getToken(): string | null {
   return typeof window !== "undefined" ? localStorage.getItem("token") : null;
