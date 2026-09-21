@@ -16,6 +16,7 @@ const envSchema = z.object({
   APP_URL: z.string().url().optional().default("http://localhost:3000"),
   // Security
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+  SUPABASE_JWT_SECRET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
