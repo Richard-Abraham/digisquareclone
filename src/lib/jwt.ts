@@ -1,6 +1,6 @@
 // Pure JWT verification helpers. No I/O, no Next/Supabase imports — directly
 // unit-testable (see src/lib/tasks.ts for the same convention).
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, createPublicKey, timingSafeEqual, verify as cryptoVerify } from "node:crypto";
 
 export interface JwtClaims { sub: string; email?: string; exp?: number; [k: string]: unknown }
 export interface VerifiedUser { id: string; email: string | undefined }
@@ -73,4 +73,64 @@ export function verifyHs256(token: string, secret: string, nowMs?: number): JwtC
 export function claimsToUser(claims: JwtClaims): VerifiedUser | null {
   if (typeof claims.sub !== "string" || !claims.sub) return null;
   return { id: claims.sub, email: typeof claims.email === "string" ? claims.email : undefined };
+}
+
+/** Algorithms we can verify locally. Anything else must go to the remote check. */
+export const SUPPORTED_ALGS = ["HS256", "ES256"] as const;
+export type SupportedAlg = (typeof SUPPORTED_ALGS)[number];
+
+export function isSupportedAlg(alg: unknown): alg is SupportedAlg {
+  return typeof alg === "string" && (SUPPORTED_ALGS as readonly string[]).includes(alg);
+}
+
+/** The `alg` and `kid` off a token's header, without verifying anything. */
+export function jwtHeaderInfo(token: string): { alg: string | null; kid: string | null } {
+  const decoded = decodeJwt(token);
+  if (!decoded) return { alg: null, kid: null };
+  const { header } = decoded;
+  return {
+    alg: typeof header.alg === "string" ? header.alg : null,
+    kid: typeof header.kid === "string" ? header.kid : null,
+  };
+}
+
+function checkExp(claims: JwtClaims, nowMs?: number): JwtClaims | null {
+  if (typeof claims.exp !== "number") return null;
+  if (claims.exp * 1000 <= (nowMs ?? Date.now())) return null;
+  return claims;
+}
+
+/**
+ * Verify an ES256 (ECDSA P-256) JWT against a JWKS public key and return its claims,
+ * or null. Supabase projects using asymmetric signing keys issue these.
+ *
+ * JWS encodes an ECDSA signature as raw r||s, which is what Node calls the
+ * "ieee-p1363" dsaEncoding — passing the default (DER) here would reject every
+ * valid token.
+ */
+export function verifyEs256(token: string, jwk: unknown, nowMs?: number): JwtClaims | null {
+  if (typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  const [headerB64, payloadB64, signatureB64] = parts;
+
+  const decoded = decodeJwt(token);
+  if (!decoded) return null;
+  if (decoded.header.alg !== "ES256") return null;
+
+  try {
+    const key = createPublicKey({ key: jwk as never, format: "jwk" });
+    const signature = base64UrlDecode(signatureB64);
+    const ok = cryptoVerify(
+      "sha256",
+      Buffer.from(`${headerB64}.${payloadB64}`),
+      { key, dsaEncoding: "ieee-p1363" },
+      signature,
+    );
+    if (!ok) return null;
+  } catch {
+    return null;
+  }
+
+  return checkExp(decoded.payload as JwtClaims, nowMs);
 }
