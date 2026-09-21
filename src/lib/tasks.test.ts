@@ -4,6 +4,7 @@ import {
   todayKey, dateToKey, keyToDate, tallyActivity, subtaskProgress,
   isAssignableRole, roleLabel, MEMBER_ROLE, MANAGER_ROLE,
   assignmentNotificationKind, deriveIdentifier,
+  isRequestType, requestTypeLabel, normalizeClientName,
 } from "./tasks";
 
 describe("isCompletedGroup", () => {
@@ -113,5 +114,45 @@ describe("subtaskProgress", () => {
   it("rounds the ratio", () => {
     expect(subtaskProgress({ total: 3, done: 1, isCompleted: false })).toBe(33);
     expect(subtaskProgress({ total: 4, done: 2, isCompleted: false })).toBe(50);
+  });
+});
+
+describe("isRequestType", () => {
+  it("accepts each known request type", () => {
+    expect(isRequestType("task")).toBe(true);
+    expect(isRequestType("fix")).toBe(true);
+    expect(isRequestType("improvement")).toBe(true);
+    expect(isRequestType("internal")).toBe(true);
+  });
+  it("rejects unknown or non-string values", () => {
+    expect(isRequestType("bug")).toBe(false);
+    expect(isRequestType("")).toBe(false);
+    expect(isRequestType(null)).toBe(false);
+    expect(isRequestType(undefined)).toBe(false);
+    expect(isRequestType(42)).toBe(false);
+  });
+});
+
+describe("requestTypeLabel", () => {
+  it("labels a known type", () => {
+    expect(requestTypeLabel("fix")).toBe("Fix");
+  });
+  it("falls back to Internal for null", () => {
+    expect(requestTypeLabel(null)).toBe("Internal");
+  });
+  it("falls back to Internal for an unknown value", () => {
+    expect(requestTypeLabel("nonsense")).toBe("Internal");
+  });
+});
+
+describe("normalizeClientName", () => {
+  it("trims and collapses internal whitespace", () => {
+    expect(normalizeClientName("  Acme   Corp  ")).toBe("Acme Corp");
+  });
+  it("leaves an already-clean name unchanged", () => {
+    expect(normalizeClientName("Acme")).toBe("Acme");
+  });
+  it("collapses tabs and newlines to single spaces", () => {
+    expect(normalizeClientName("\tAcme\nCorp ")).toBe("Acme Corp");
   });
 });
