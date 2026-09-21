@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getAdmin } from "@/lib/supabase";
+import { getAdmin, getAuthClient } from "@/lib/supabase";
 import { ok, err } from "@/lib/response";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { parseBody, resetPasswordSchema } from "@/lib/validation";
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) return err(parsed.error);
 
     const { password, token } = parsed.data;
-    const { data, error } = await getAdmin().auth.verifyOtp({ token_hash: token, type: "recovery" });
+    const { data, error } = await getAuthClient().auth.verifyOtp({ token_hash: token, type: "recovery" });
     if (error || !data.session || !data.user) {
       return err("Reset link is invalid or has expired.", { status: 401 });
     }

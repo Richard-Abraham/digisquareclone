@@ -51,7 +51,10 @@ export async function POST(req: NextRequest) {
       const { data: created, error: we } = await getAdmin().from("workspaces")
         .insert({ name: `${display}'s Workspace`, slug, owner_id: user.id }).select("id, slug, owner_id").single();
       if (we || !created) return err(we?.message || "Could not create workspace", 400);
-      await getAdmin().from("workspace_members").insert({ workspace_id: created.id, user_id: user.id, role: MANAGER_ROLE });
+      {
+        const { error: me } = await getAdmin().from("workspace_members").insert({ workspace_id: created.id, user_id: user.id, role: MANAGER_ROLE });
+        if (me) logger.error("bootstrap: owner membership insert failed", me, { workspaceId: created.id });
+      }
       ws = created;
     }
 

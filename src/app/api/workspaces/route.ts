@@ -36,7 +36,10 @@ export async function POST(req: NextRequest) {
     const { name, slug } = parsed.data;
     const { data: ws, error: we } = await getAdmin().from("workspaces").insert({ name, slug, owner_id: user.id }).select().single();
     if (we) return err(we.message, { status: 400 });
-    await getAdmin().from("workspace_members").insert({ workspace_id: ws.id, user_id: user.id, role: 5 });
+    {
+      const { error: me } = await getAdmin().from("workspace_members").insert({ workspace_id: ws.id, user_id: user.id, role: 5 });
+      if (me) logger.error("createWorkspace: owner membership insert failed", me, { workspaceId: ws.id });
+    }
     return ok(ws, { status: 201 });
   } catch (e) {
     logger.error("POST /api/workspaces failed", e);

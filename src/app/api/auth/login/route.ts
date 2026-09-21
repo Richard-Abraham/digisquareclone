@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdmin } from "@/lib/supabase";
+import { getAdmin, getAuthClient } from "@/lib/supabase";
 import { err } from "@/lib/response";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { parseBody, loginSchema } from "@/lib/validation";
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) return err(parsed.error);
 
     const { email, password } = parsed.data;
-    const { data, error: ae } = await getAdmin().auth.signInWithPassword({ email, password });
+    const { data, error: ae } = await getAuthClient().auth.signInWithPassword({ email, password });
     if (ae || !data?.user) {
       console.error("[login] Supabase signInWithPassword error:", ae?.message, ae?.code);
       return err("Invalid credentials", { status: 401 });
@@ -28,9 +28,12 @@ export async function POST(req: NextRequest) {
     let { data: profile } = await getAdmin().from("profiles").select("*").eq("user_id", data.user.id).maybeSingle();
     if (!profile) {
       const displayName = data.user.email?.split("@")[0] || "User";
-      const { data: newProfile } = await getAdmin().from("profiles")
+      const { data: newProfile, error: pe } = await getAdmin().from("profiles")
         .insert({ user_id: data.user.id, display_name: displayName })
         .select().single();
+      // Don't fail the login over this, but never swallow it: a null profile here
+      // surfaces much later as a confusing "That user no longer exists".
+      if (pe) logger.error("login: could not create missing profile", pe, { userId: data.user.id });
       profile = newProfile;
     }
 
