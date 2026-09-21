@@ -49,6 +49,18 @@ export const TOUR_STEPS: TourStep[] = [
     side: "top",
   },
   {
+    id: "task-client",
+    title: "Attribute to a client",
+    description: "Pick an existing client or add a new one so this task's work can be tracked back to who asked for it.",
+    side: "top",
+  },
+  {
+    id: "task-request-type",
+    title: "Request type",
+    description: "Say whether this came in as a bug, a feature, or another kind of request — it shows up in the analytics later.",
+    side: "top",
+  },
+  {
     id: "nav-my-tasks",
     title: "My Tasks",
     description: "A filtered view of just the tasks assigned to you, across every project you're on.",

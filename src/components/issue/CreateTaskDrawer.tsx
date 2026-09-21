@@ -212,6 +212,7 @@ export function CreateTaskDrawer({ open, onClose, wsSlug, projId, members, onCre
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
             className="select"
+            data-tour="task-client"
           >
             <option value="">Internal / no client</option>
             {(clients || []).map((c) => (
@@ -242,6 +243,7 @@ export function CreateTaskDrawer({ open, onClose, wsSlug, projId, members, onCre
                 value={requestType}
                 onChange={(e) => setRequestType(e.target.value)}
                 className="select"
+                data-tour="task-request-type"
               >
                 {REQUEST_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>

@@ -353,7 +353,7 @@ export default function IssuesPage() {
               <span className="hidden sm:inline">Insights</span>
             </button>
             <Button variant="secondary" size="sm" onClick={() => setShowProj(true)}>New Project</Button>
-            <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+            <Button variant="primary" size="sm" data-tour="new-task" onClick={() => setShowCreate(true)}>
               <Plus size={14} strokeWidth={2.5} />
               New Task
             </Button>
@@ -405,7 +405,7 @@ export default function IssuesPage() {
           {/* Overview stats */}
           <div>
             <h3 className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-2.5">Overview</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3" data-tour="stats-overview">
               <StatCard label="Total Tasks" value={total} icon={<TasksIcon />} />
               <StatCard label="Team Members" value={members.length} icon={<UserIcon />} />
               <StatCard label="Active" value={statsByState.started || 0} sub="In Progress" icon={<ChartIcon />} color={chartColors.amber} />
@@ -465,7 +465,7 @@ export default function IssuesPage() {
         onDragCancel={handleDragCancel}
       >
         <div className="flex-1 min-h-[420px] overflow-x-auto overflow-y-hidden px-4 sm:px-6 py-5 bg-surface">
-          <div className="flex gap-4 h-full snap-x snap-proximity items-start">
+          <div className="flex gap-4 h-full snap-x snap-proximity items-start" data-tour="kanban-columns">
             {GROUPS.map((group) => {
               const stateInfo = states.find(s => s.group_name === group);
               const droppable = !!stateInfo;

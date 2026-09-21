@@ -28,6 +28,17 @@ const SHORTCUTS: Record<string, string> = {
 interface NavItem { href: string; icon: React.ReactNode; label: string; pattern: (p: string) => boolean; badge?: number }
 interface NavGroup { label: string; items: NavItem[] }
 
+// data-tour anchors for the sidebar links the product tour points at
+// (see src/lib/tour.ts TOUR_STEPS); hrefs with no entry get no attribute.
+const NAV_TOUR_IDS: Record<string, string> = {
+  "/dashboard": "nav-board",
+  "/dashboard/my-tasks": "nav-my-tasks",
+  "/dashboard/requests": "nav-requests",
+  "/dashboard/standup": "nav-standup",
+  "/dashboard/notifications": "nav-notifications",
+  "/dashboard/analytics": "nav-analytics",
+};
+
 interface NotifItem { id: string; kind: string; read_at: string | null; created_at: string; issue_id: string; project_id: string | null; issue_name: string; workspace_slug: string | null; actor_name: string }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -137,7 +148,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* Sidebar */}
-      <aside aria-label="Main navigation" className={`
+      <aside aria-label="Main navigation" data-tour="sidebar" className={`
         fixed inset-y-0 left-0 z-50 w-64 bg-surface-1 border-r border-border flex flex-col
         bg-gradient-to-b from-surface-1 to-surface
         transform transition-transform duration-200 ease-in-out
@@ -177,6 +188,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <div key={item.href} className="relative" ref={notifRef}>
                         <button
                           onClick={() => setNotifOpen(v => !v)}
+                          data-tour={NAV_TOUR_IDS[item.href]}
                           className={`group relative w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
                             ${active
                               ? "bg-gradient-to-r from-primary-50 to-primary-50/40 text-primary shadow-sm dark:from-primary-500/15 dark:to-primary-500/5 dark:text-primary-300"
@@ -246,6 +258,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   const shortcut = SHORTCUTS[item.label];
                   return (
                     <Link key={item.href} href={item.href}
+                      data-tour={NAV_TOUR_IDS[item.href]}
                       className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
                         ${active
                           ? "bg-gradient-to-r from-primary-50 to-primary-50/40 text-primary shadow-sm dark:from-primary-500/15 dark:to-primary-500/5 dark:text-primary-300"
