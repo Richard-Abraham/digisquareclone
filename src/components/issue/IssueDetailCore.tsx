@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { BugIcon, CloseIcon } from "@/components/icons";
 import { Spinner } from "@/components/ui/States";
+import { REQUEST_TYPES } from "@/lib/tasks";
 
 interface State { id: string; name: string; group_name: string; color: string; }
 interface Dep { id: string; name: string; sequence_id: number; state: { name: string; group_name: string; color: string } | null }
@@ -24,6 +25,11 @@ interface CoreIssue {
   assignees?: { user_id?: string; display_name?: string }[];
   state: State | null;
   tag_ids?: string[];
+  client_id?: string | null;
+  client?: { id: string; name: string } | null;
+  request_type?: string;
+  requested_by?: string | null;
+  requested_at?: string | null;
 }
 
 interface SubTask { id: string; title: string; done: boolean; }
@@ -90,6 +96,8 @@ export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: extern
   const [editPriority, setEditPriority] = useState(externalIssue?.priority ?? "none");
   const [editTargetDate, setEditTargetDate] = useState(externalIssue?.target_date ?? "");
   const [editBug, setEditBug] = useState(externalIssue?.is_bug ?? false);
+  const [editRequestType, setEditRequestType] = useState(externalIssue?.request_type ?? "internal");
+  const [editRequestedBy, setEditRequestedBy] = useState(externalIssue?.requested_by ?? "");
   const [timerActive, setTimerActive] = useState(false);
   const [totalSeconds, setTotalSeconds] = useState(0);
   const [timerBusy, setTimerBusy] = useState(false);
@@ -136,6 +144,8 @@ export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: extern
       setEditTargetDate(b.issue.target_date || "");
       setEditBug(b.issue.is_bug);
       setEditDesc(b.issue.description_html ?? "");
+      setEditRequestType(b.issue.request_type ?? "internal");
+      setEditRequestedBy(b.issue.requested_by ?? "");
       onIssueUpdated?.(b.issue);
     } catch {} finally { setLoading(false); }
   }, [base, onIssueUpdated]);
@@ -151,8 +161,10 @@ export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: extern
       setEditTargetDate(externalIssue.target_date || "");
       setEditBug(externalIssue.is_bug);
       setEditDesc(externalIssue.description_html ?? "");
+      setEditRequestType(externalIssue.request_type ?? "internal");
+      setEditRequestedBy(externalIssue.requested_by ?? "");
     }
-  }, [externalIssue?.id, externalIssue?.name, externalIssue?.state_id, externalIssue?.priority, externalIssue?.target_date, externalIssue?.is_bug]);
+  }, [externalIssue?.id, externalIssue?.name, externalIssue?.state_id, externalIssue?.priority, externalIssue?.target_date, externalIssue?.is_bug, externalIssue?.request_type, externalIssue?.requested_by]);
 
   useEffect(() => { if (externalMembers) setMembers(externalMembers); }, [externalMembers]);
   useEffect(() => { if (externalActivity) setActivity(externalActivity); }, [externalActivity]);
@@ -203,7 +215,7 @@ export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: extern
     if (!issue) return;
     setSaving(true);
     try {
-      const updated = await api<CoreIssue>(base, { method: "PATCH", body: { name: editName, state_id: editState || undefined, priority: editPriority, target_date: editTargetDate || null, is_bug: editBug } });
+      const updated = await api<CoreIssue>(base, { method: "PATCH", body: { name: editName, state_id: editState || undefined, priority: editPriority, target_date: editTargetDate || null, is_bug: editBug, request_type: editRequestType, requested_by: editRequestedBy || null } });
       setIssue(updated);
       onIssueUpdated?.(updated);
     } catch {} finally { setSaving(false); }
@@ -387,6 +399,24 @@ export function IssueDetailCore({ issueId, wsSlug, projId, states, issue: extern
         <div>
           <label className={labelClass}>Due</label>
           <input type="date" value={editTargetDate} onChange={(e) => { setEditTargetDate(e.target.value); setTimeout(save, 0); }} className="input text-xs" />
+        </div>
+      </div>
+
+      {/* Client / Request type / Requested by */}
+      <div className={`grid ${compact ? "grid-cols-3 gap-3" : "grid-cols-1 sm:grid-cols-3 gap-4"}`}>
+        <div>
+          <label className={labelClass}>Client</label>
+          <p className="input text-xs flex items-center text-text-secondary">{issue.client?.name ?? "—"}</p>
+        </div>
+        <div>
+          <label className={labelClass}>Request type</label>
+          <select value={editRequestType} onChange={(e) => { setEditRequestType(e.target.value); setTimeout(save, 0); }} className="select text-xs">
+            {REQUEST_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Requested by</label>
+          <input value={editRequestedBy} onChange={(e) => setEditRequestedBy(e.target.value)} onBlur={save} className="input text-xs" />
         </div>
       </div>
 

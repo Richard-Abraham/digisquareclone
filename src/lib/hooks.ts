@@ -8,6 +8,7 @@ export interface Workspace { id: string; slug: string; name: string; owner_id: s
 export interface Project { id: string; name: string; identifier: string }
 export interface Member { user_id: string; role: number; is_owner: boolean; profile: { display_name?: string } | null }
 export interface State { id: string; name: string; group_name: string; color: string; }
+export interface Client { id: string; name: string; contact_name: string | null; contact_email: string | null; notes: string | null }
 
 /** Primary workspace for the current user (cached, shared across pages). */
 export function useWorkspace() {
@@ -54,6 +55,16 @@ export function useStates(slug: string | undefined, projectId: string | undefine
   });
 }
 
+/** Clients in the current workspace. */
+export function useClients(slug: string | undefined) {
+  return useQuery({
+    queryKey: ["clients", slug],
+    queryFn: async () => api<Client[]>(`/api/workspaces/${slug}/clients`),
+    enabled: !!slug,
+    staleTime: 30_000,
+  });
+}
+
 /** Unread notification count (shared between layout badge + notifications page). */
 export function useUnreadCount(enabled: boolean) {
   return useQuery({
@@ -74,5 +85,6 @@ export function useInvalidateWorkspace() {
   return (slug: string) => {
     qc.invalidateQueries({ queryKey: ["projects", slug] });
     qc.invalidateQueries({ queryKey: ["members", slug] });
+    qc.invalidateQueries({ queryKey: ["clients", slug] });
   };
 }

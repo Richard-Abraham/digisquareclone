@@ -15,7 +15,7 @@ import { logger } from "@/lib/logger";
 import {
   TasksIcon, UserIcon, CalendarIcon, BellIcon, UsersIcon, ChartIcon, FolderIcon,
 } from "@/components/icons";
-import { X, BellOff, LogOut, Menu, ClipboardList } from "lucide-react";
+import { X, BellOff, LogOut, Menu, ClipboardList, Briefcase } from "lucide-react";
 
 const SHORTCUTS: Record<string, string> = {
   Board: "N",
@@ -106,6 +106,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { href: "/dashboard", label: "Board", icon: <TasksIcon />, pattern: (p) => p === "/dashboard" || p.startsWith("/dashboard/issues") },
         { href: "/dashboard/my-tasks", label: "My Tasks", icon: <UserIcon />, pattern: (p) => p.startsWith("/dashboard/my-tasks") },
         { href: "/dashboard/projects", label: "Projects", icon: <FolderIcon />, pattern: (p) => p.startsWith("/dashboard/projects") },
+        { href: "/dashboard/requests", label: "Requests", icon: <Briefcase size={18} strokeWidth={1.8} />, pattern: (p) => p.startsWith("/dashboard/requests") },
       ],
     },
     {

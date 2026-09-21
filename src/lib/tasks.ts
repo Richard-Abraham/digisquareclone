@@ -111,3 +111,33 @@ export function subtaskProgress(opts: { total: number; done: number; isCompleted
   if (opts.total > 0) return Math.round((opts.done / opts.total) * 100);
   return null;
 }
+
+// ── Client requests ───────────────────────────────────────────────
+
+export const REQUEST_TYPES = [
+  { value: "task", label: "New task" },
+  { value: "fix", label: "Fix" },
+  { value: "improvement", label: "Improvement" },
+  { value: "internal", label: "Internal" },
+] as const;
+
+export type RequestType = (typeof REQUEST_TYPES)[number]["value"];
+
+export function isRequestType(value: unknown): value is RequestType {
+  return REQUEST_TYPES.some((t) => t.value === value);
+}
+
+/** Label for a stored request_type, falling back to "Internal" for unknown values. */
+export function requestTypeLabel(value: string | null | undefined): string {
+  return REQUEST_TYPES.find((t) => t.value === value)?.label ?? "Internal";
+}
+
+/** Normalise a client name for duplicate detection (the DB index uses lower(name)). */
+export function normalizeClientName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+/** Escape LIKE/ILIKE wildcards so a client name is matched literally. */
+export function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
