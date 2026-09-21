@@ -68,6 +68,27 @@ Two corrections to the plan's own instructions, learned during execution:
   was wrong: `issues/route.ts:63` is the issue-title substring search and must keep its
   `%…%` wildcards. The executor correctly refused to comply and flagged it.
 
+## 007 — execution record (2026-09-21)
+
+Executed, reviewed, merged. `npx tsc --noEmit` exit 0, `npm test` 70 passed. Migration
+`0012_profile_tutorial_flag.sql` applied and recorded. `driver.js@1.3.6` pinned exactly,
+imported by exactly one file.
+
+**Unverified by anyone: everything visual.** No `.env` exists locally, so the tour has
+never been rendered. A human must still confirm: it auto-starts for a fresh profile; the
+tooltip is legible in dark mode; Skip persists across a reload; "Take the tour" replays it;
+and Esc / overlay-click count as a decision rather than leaving it pending.
+
+One executor deviation, reviewed and approved: the six `nav-*` anchors are assigned from a
+`NAV_TOUR_IDS` lookup inside the existing `navGroups.map()` rather than as literal
+attributes, because the sidebar links are rendered from one shared loop. Hard-coding six
+copies would have meant restructuring `layout.tsx` — a real change to out-of-scope
+behaviour — for no functional gain.
+
+**Known follow-up**: `Profile` in `src/lib/providers.tsx` does not declare
+`tutorial_completed_at`, so `layout.tsx` casts at the one call site. The field is out of
+scope for plan 007; adding it properly is a one-line cleanup.
+
 ## 006 — execution record (2026-09-21)
 
 Executed in an isolated worktree, reviewed, merged as `c1aacd3`. Gates re-run by the
