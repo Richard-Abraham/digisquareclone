@@ -199,7 +199,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     let createdIssue = issue;
     if (Object.keys(requestFields).length) {
       const { data: withClient } = await getAdmin().from("issues")
-        .update(requestFields).eq("id", issue.id).select("*, client:clients(id, name)").single();
+        .update(requestFields).eq("id", issue.id).select("*, state:states(*), client:clients(id, name)").single();
       if (withClient) createdIssue = withClient;
     }
 
