@@ -27,6 +27,15 @@ import {
 
 interface Member { user_id: string; profile: { display_name: string } | null; }
 
+interface DashboardInit {
+  workspace: { id: string; slug: string; name: string } | null;
+  projects: { id: string; name: string; identifier?: string }[];
+  project_id: string | null;
+  members: { user_id: string; role: number; is_owner: boolean; profile: { display_name: string } | null }[];
+  states: State[];
+  issues: { issues: Issue[]; total: number; page: number; pageSize: number };
+}
+
 const PAGE_SIZE = 50;
 
 function emptyColumns(): Record<Group, Issue[]> {
@@ -70,27 +79,34 @@ export default function IssuesPage() {
 
   async function loadAll() {
     try {
-      const ws = await api<{ slug: string }[]>("/api/workspaces");
-      if (!ws.length) { setLoading(false); return; }
-      const slug = ws[0].slug;
-      setWsSlug(slug);
-      const proj = await api<{ id: string; name: string }[]>(`/api/workspaces/${slug}/projects`);
-      if (!proj.length) { setLoading(false); return; }
-      setProjects(proj);
       const requestedPid = new URLSearchParams(window.location.search).get("proj");
-      const lastPid = localStorage.getItem(`lastProject:${slug}`);
-      const pid = requestedPid && proj.some((p) => p.id === requestedPid)
-        ? requestedPid
-        : lastPid && proj.some((p) => p.id === lastPid)
-          ? lastPid
-          : proj[0].id;
-      setProjId(pid);
-      localStorage.setItem(`lastProject:${slug}`, pid);
-      await Promise.all([
-        api<{ members: { user_id: string; profile: { display_name: string } | null }[] }>(`/api/workspaces/${slug}/members`).then(r => setMembers(r.members.map((m: any) => ({ user_id: m.user_id, profile: m.profile })))),
-        api<State[]>(`/api/workspaces/${slug}/projects/${pid}/states`).then(setStates),
-        loadIssues(slug, pid),
-      ]);
+      // The server now resolves the workspace + project in one call, so the "last
+      // project" preference must be readable BEFORE we know the slug (it used to be
+      // read after the first /api/workspaces round-trip). We keep writing the existing
+      // per-slug key below (grep -rn "lastProject:" src/ shows only this file reads it,
+      // but keep it for compatibility) and additionally read/write a slug-independent
+      // key so the very first request of a session can still pass a project hint.
+      const storedPid = localStorage.getItem("lastProjectId");
+      const pid = requestedPid || storedPid;
+      const qs = pid ? `?proj=${encodeURIComponent(pid)}` : "";
+      const init = await api<DashboardInit>(`/api/dashboard/init${qs}`);
+      if (!init.workspace) { setLoading(false); return; }
+      const slug = init.workspace.slug;
+      setWsSlug(slug);
+      if (!init.projects.length) { setProjects([]); setLoading(false); return; }
+      setProjects(init.projects);
+      if (init.project_id) {
+        setProjId(init.project_id);
+        localStorage.setItem(`lastProject:${slug}`, init.project_id);
+        localStorage.setItem("lastProjectId", init.project_id);
+      }
+      setMembers(init.members.map((m) => ({ user_id: m.user_id, profile: m.profile })));
+      setStates(init.states);
+      setIssues(init.issues.issues);
+      setTotal(init.issues.total);
+      setPage(init.issues.page);
+      setLoadError(null);
+      setLoading(false);
     } catch (e) { setLoadError(e instanceof Error ? e.message : "Failed to load workspace data"); setLoading(false); }
   }
 
