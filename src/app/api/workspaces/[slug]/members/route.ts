@@ -3,7 +3,7 @@ import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { getAdmin } from "@/lib/supabase";
 import { getWorkspaceAccess } from "@/lib/access";
-import { isAssignableRole, MEMBER_ROLE } from "@/lib/tasks";
+import { isAssignableRole, MEMBER_ROLE, MANAGER_ROLE } from "@/lib/tasks";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { resolveProfiles } from "@/lib/profiles";
@@ -23,6 +23,12 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
 
     const { data: members } = await getAdmin().from("workspace_members").select("user_id, role").eq("workspace_id", wsId);
     const ids = (members || []).map((m: any) => m.user_id);
+    // getWorkspaceAccess admits the workspace owner even without a workspace_members row
+    // (src/lib/access.ts:55), so an owner with no row would otherwise be invisible here —
+    // producing an empty member list, an empty assignee picker and "Team Members 0". Add
+    // the owner to `ids` before resolveProfiles (so the name is filled in) and before the
+    // candidates query below (so the owner doesn't appear in their own "add member" picker).
+    if (!ids.includes(access.workspace.owner_id)) ids.push(access.workspace.owner_id);
     const pm = await resolveProfiles(ids);
 
     const rows = (members || []).map((m: any) => ({
@@ -30,7 +36,11 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       role: m.role,
       is_owner: m.user_id === access.workspace.owner_id,
       profile: pm.get(m.user_id) || null,
-    })).sort((a, b) => Number(b.is_owner) - Number(a.is_owner) || (b.role ?? 0) - (a.role ?? 0));
+    }));
+    if (!rows.some((r) => r.user_id === access.workspace.owner_id)) {
+      rows.push({ user_id: access.workspace.owner_id, role: MANAGER_ROLE, is_owner: true, profile: pm.get(access.workspace.owner_id) || null });
+    }
+    rows.sort((a, b) => Number(b.is_owner) - Number(a.is_owner) || (b.role ?? 0) - (a.role ?? 0));
 
     let candidates: { user_id: string; display_name: string }[] = [];
     if (access.isManager) {
