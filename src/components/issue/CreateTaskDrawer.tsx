@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { SpinnerIcon } from "@/components/icons";
 import { PRIORITIES, PRIO_META, type Issue } from "@/app/dashboard/kanban-parts";
+import { useClients } from "@/lib/hooks";
+import { REQUEST_TYPES } from "@/lib/tasks";
 
 interface Member {
   user_id: string;
@@ -28,14 +30,23 @@ interface CreateTaskInput {
   priority: string;
   assignee_ids: string[];
   is_bug: boolean;
+  client_id?: string;
+  client_name?: string;
+  request_type?: string;
+  requested_by?: string;
 }
 
 export function CreateTaskDrawer({ open, onClose, wsSlug, projId, members, onCreated }: CreateTaskDrawerProps) {
+  const { data: clients } = useClients(wsSlug || undefined);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("none");
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [isBug, setIsBug] = useState(false);
+  const [clientId, setClientId] = useState("");
+  const [newClientName, setNewClientName] = useState("");
+  const [requestType, setRequestType] = useState("internal");
+  const [requestedBy, setRequestedBy] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [touched, setTouched] = useState(false);
 
@@ -48,6 +59,10 @@ export function CreateTaskDrawer({ open, onClose, wsSlug, projId, members, onCre
       setPriority("none");
       setAssigneeIds([]);
       setIsBug(false);
+      setClientId("");
+      setNewClientName("");
+      setRequestType("internal");
+      setRequestedBy("");
       setTouched(false);
     }
   }, [open]);
@@ -79,6 +94,10 @@ export function CreateTaskDrawer({ open, onClose, wsSlug, projId, members, onCre
       priority,
       assignee_ids: assigneeIds,
       is_bug: isBug,
+      ...(clientId && clientId !== "__new" ? { client_id: clientId } : {}),
+      ...(clientId === "__new" && newClientName.trim() ? { client_name: newClientName.trim() } : {}),
+      ...(clientId ? { request_type: requestType } : {}),
+      ...(requestedBy.trim() ? { requested_by: requestedBy.trim() } : {}),
     };
 
     try {
@@ -184,6 +203,61 @@ export function CreateTaskDrawer({ open, onClose, wsSlug, projId, members, onCre
             </label>
           </div>
         </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+            Client
+          </label>
+          <select
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+            className="select"
+          >
+            <option value="">Internal / no client</option>
+            {(clients || []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+            <option value="__new">+ Add a new client…</option>
+          </select>
+        </div>
+
+        {clientId === "__new" && (
+          <Input
+            label="New client name"
+            value={newClientName}
+            onChange={(e) => setNewClientName(e.target.value)}
+            placeholder="e.g. Acme Corp"
+          />
+        )}
+
+        {clientId !== "" && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+                Request type
+              </label>
+              <select
+                value={requestType}
+                onChange={(e) => setRequestType(e.target.value)}
+                className="select"
+              >
+                {REQUEST_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Input
+              label="Requested by"
+              value={requestedBy}
+              onChange={(e) => setRequestedBy(e.target.value)}
+              placeholder="Client contact who asked"
+            />
+          </div>
+        )}
 
         <div>
           <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
