@@ -5,7 +5,7 @@ import { getUser } from "@/lib/auth";
 import { writeActivity } from "@/lib/activity";
 import { writeNotifications } from "@/lib/notifications";
 import { ensureProjectMembers, getProjectAccess } from "@/lib/access";
-import { assignmentNotificationKind } from "@/lib/tasks";
+import { assignmentNotificationKind, isRequestType, normalizeClientName } from "@/lib/tasks";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { resolveProfiles } from "@/lib/profiles";
@@ -107,8 +107,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       name?: string; description_html?: string; priority?: string; state_id?: string;
       assignee_id?: string; assignee_ids?: string[]; reviewer_ids?: string[]; tag_ids?: string[];
       is_bug?: boolean; start_date?: string; target_date?: string; parent_id?: string;
+      client_id?: string; client_name?: string; request_type?: string; requested_by?: string; requested_at?: string;
     };
     if (!body.name?.trim()) return err("Name is required");
+    if (body.request_type && !isRequestType(body.request_type)) return err("Invalid request_type");
 
     const assigneeIds = Array.from(new Set(body.assignee_ids || (body.assignee_id ? [body.assignee_id] : [])));
     const reviewerIds = Array.from(new Set(body.reviewer_ids || []));
@@ -125,6 +127,28 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         .limit(1)
         .single();
       if (!anyState) return err("Project has no states. Create a state first.", 400);
+    }
+
+    // Resolve the client before creating the issue: verify an existing client_id belongs
+    // to this workspace, or create-or-reuse a client by name (same rule as the clients route).
+    let clientId: string | null = null;
+    if (body.client_id) {
+      const { data: existingClient } = await getAdmin().from("clients").select("id")
+        .eq("id", body.client_id).eq("workspace_id", project.workspace_id).is("archived_at", null).maybeSingle();
+      if (!existingClient) return err("Client not found", 404);
+      clientId = existingClient.id;
+    } else if (body.client_name?.trim()) {
+      const normalized = normalizeClientName(body.client_name);
+      const { data: existingByName } = await getAdmin().from("clients").select("id")
+        .eq("workspace_id", project.workspace_id).is("archived_at", null).ilike("name", normalized).maybeSingle();
+      if (existingByName) {
+        clientId = existingByName.id;
+      } else {
+        const { data: newClient, error: ce } = await getAdmin().from("clients")
+          .insert({ workspace_id: project.workspace_id, name: normalized, created_by: user.id }).select("id").single();
+        if (ce) return err(ce.message, 400);
+        clientId = newClient.id;
+      }
     }
 
     // R1 + R2: atomic issue creation via PostgreSQL function (transaction + serialized sequence).
@@ -153,6 +177,24 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return err(ie.message, 400);
     }
 
+    // Persist the client-request fields with a follow-up update rather than widening
+    // create_issue_atomic's signature (see plan 003: a second overload risks
+    // "could not choose a best candidate function" on rpc() dispatch). Not part of the
+    // same transaction as the insert — see Maintenance notes in the plan.
+    const requestFields: Record<string, unknown> = {};
+    if (clientId) requestFields.client_id = clientId;
+    if (body.request_type) requestFields.request_type = body.request_type;
+    if (body.requested_by?.trim()) requestFields.requested_by = body.requested_by.trim();
+    if (body.requested_at) requestFields.requested_at = body.requested_at;
+    if (clientId && !body.requested_at) requestFields.requested_at = new Date().toISOString();
+
+    let createdIssue = issue;
+    if (Object.keys(requestFields).length) {
+      const { data: withClient } = await getAdmin().from("issues")
+        .update(requestFields).eq("id", issue.id).select("*, client:clients(id, name)").single();
+      if (withClient) createdIssue = withClient;
+    }
+
     // Grant project access and notify recipients (outside the DB transaction).
     await ensureProjectMembers(params.projectId, [user.id, ...assigneeIds, ...reviewerIds]);
 
@@ -165,7 +207,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const pm = new Map((profiles || []).map((p: any) => [p.user_id, p]));
 
     const enrichedIssue = {
-      ...issue,
+      ...createdIssue,
       assignee: issue.assignee_id ? pm.get(issue.assignee_id) || null : null,
       assignees: assigneeIds.map((id) => pm.get(id) || { user_id: id }),
       creator: issue.created_by ? pm.get(issue.created_by) || null : null,
