@@ -16,7 +16,7 @@ import { ProductTour } from "@/components/tour/ProductTour";
 import { shouldAutoStart } from "@/lib/tour";
 import { toast } from "sonner";
 import {
-  TasksIcon, UserIcon, CalendarIcon, BellIcon, UsersIcon, ChartIcon, FolderIcon,
+  TasksIcon, UserIcon, CalendarIcon, BellIcon, UsersIcon, ChartIcon, FolderIcon, EyeIcon,
 } from "@/components/icons";
 import { X, BellOff, LogOut, Menu, ClipboardList, Briefcase } from "lucide-react";
 
@@ -166,6 +166,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       label: "Team",
       items: [
         { href: "/dashboard/members", label: "Members", icon: <UsersIcon />, pattern: (p) => p.startsWith("/dashboard/members") },
+        { href: "/dashboard/credentials", label: "Credentials", icon: <EyeIcon />, pattern: (p) => p.startsWith("/dashboard/credentials") },
         { href: "/dashboard/analytics", label: "Analytics", icon: <ChartIcon />, pattern: (p) => p.includes("/analytics") },
       ],
     },
