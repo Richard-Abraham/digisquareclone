@@ -9,6 +9,12 @@ export interface Project { id: string; name: string; identifier: string }
 export interface Member { user_id: string; role: number; is_owner: boolean; profile: { display_name?: string } | null }
 export interface State { id: string; name: string; group_name: string; color: string; }
 export interface Client { id: string; name: string; contact_name: string | null; contact_email: string | null; notes: string | null }
+export interface Credential {
+  id: string; workspace_id: string; client_id: string | null; label: string; description: string | null;
+  file_name: string; mime_type: string; size_bytes: number; uploaded_by: string; created_at: string;
+  uploader: { user_id: string; display_name: string } | null;
+  access_count?: number;
+}
 
 /** Primary workspace for the current user (cached, shared across pages). */
 export function useWorkspace() {
@@ -60,6 +66,16 @@ export function useClients(slug: string | undefined) {
   return useQuery({
     queryKey: ["clients", slug],
     queryFn: async () => api<Client[]>(`/api/workspaces/${slug}/clients`),
+    enabled: !!slug,
+    staleTime: 30_000,
+  });
+}
+
+/** Credentials in the current workspace. */
+export function useCredentials(slug: string | undefined) {
+  return useQuery({
+    queryKey: ["credentials", slug],
+    queryFn: async () => api<Credential[]>(`/api/workspaces/${slug}/credentials`),
     enabled: !!slug,
     staleTime: 30_000,
   });
