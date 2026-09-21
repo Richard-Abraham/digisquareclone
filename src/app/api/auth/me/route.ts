@@ -13,13 +13,21 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const user = await getUser(req);
   if (!user) return err("Unauthorized", 401);
-  const { display_name, bio } = await req.json() as { display_name?: string; bio?: string };
+  const { display_name, bio, tutorial_completed_at } = await req.json() as {
+    display_name?: string;
+    bio?: string;
+    tutorial_completed_at?: boolean;
+  };
   const updates: Record<string, string> = {};
   if (display_name !== undefined) {
     if (!display_name?.trim()) return err("Name required");
     updates.display_name = display_name.trim();
   }
   if (bio !== undefined) updates.bio = bio;
+  // Only a boolean flag is accepted from the client — the timestamp itself is
+  // always set server-side so a client can never write an arbitrary value
+  // into this column.
+  if (tutorial_completed_at === true) updates.tutorial_completed_at = new Date().toISOString();
   if (Object.keys(updates).length === 0) return err("No fields to update");
   const { data, error: e } = await getAdmin().from("profiles").update(updates).eq("user_id", user.id).select().single();
   if (e) return err(e.message, 400);

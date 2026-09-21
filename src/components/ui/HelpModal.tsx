@@ -1,10 +1,12 @@
 "use client";
 
 import { Modal } from "./Modal";
+import { Button } from "./Button";
 
 interface HelpModalProps {
   open: boolean;
   onClose: () => void;
+  onStartTour?: () => void;
 }
 
 const shortcuts = [
@@ -14,7 +16,7 @@ const shortcuts = [
   { keys: ["Cmd", "K"], description: "Command palette (coming soon)" },
 ];
 
-export function HelpModal({ open, onClose }: HelpModalProps) {
+export function HelpModal({ open, onClose, onStartTour }: HelpModalProps) {
   return (
     <Modal open={open} onClose={onClose} title="Keyboard shortcuts" maxWidth="sm:max-w-sm">
       <div className="space-y-3">
@@ -31,6 +33,21 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
           </div>
         ))}
       </div>
+      {onStartTour && (
+        <div className="mt-4 pt-4 border-t border-border-subtle">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            onClick={() => {
+              onClose();
+              onStartTour();
+            }}
+          >
+            Take the tour
+          </Button>
+        </div>
+      )}
     </Modal>
   );
 }
