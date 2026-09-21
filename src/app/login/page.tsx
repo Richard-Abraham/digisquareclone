@@ -16,6 +16,7 @@ import {
 import projectImage from "@/assets/project_maanagement.jpg";
 import { loginSchema, registerSchema, type LoginInput, type RegisterInput } from "@/lib/validation";
 import { logger } from "@/lib/logger";
+import { useAuth } from "@/lib/providers";
 
 const REMEMBER_KEY = "digisystem-remember-email";
 
@@ -25,6 +26,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("login");
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+  const { refresh: refreshAuth } = useAuth();
 
   const loginForm = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -63,6 +65,10 @@ export default function LoginPage() {
       if (values.remember) localStorage.setItem(REMEMBER_KEY, values.email);
       else localStorage.removeItem(REMEMBER_KEY);
       toast.success("Signed in successfully");
+      // The AuthProvider only loads auth state on mount, and router.push is a
+      // client-side navigation that does not remount it. Without this refresh the
+      // dashboard guard would still see a stale null user and bounce back to /login.
+      await refreshAuth();
       router.push("/dashboard");
     } catch (e) {
       logger.warn("login submit failed", undefined, e);

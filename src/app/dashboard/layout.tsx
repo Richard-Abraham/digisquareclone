@@ -31,7 +31,7 @@ interface NavGroup { label: string; items: NavItem[] }
 interface NotifItem { id: string; kind: string; read_at: string | null; created_at: string; issue_id: string; project_id: string | null; issue_name: string; workspace_slug: string | null; actor_name: string }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile, ready } = useAuth();
+  const { user, profile, ready, refresh: refreshAuth } = useAuth();
   const [unread, setUnread] = useState(0);
   const [workspaceName, setWorkspaceName] = useState("");
   const [workspaceOwnerId, setWorkspaceOwnerId] = useState<string | null>(null);
@@ -295,6 +295,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   setLoggingOut(true);
                   clearToken();
                   try { await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }); } catch (e) { logger.warn("logout request failed", undefined, e); }
+                  // Mirror of the login fix: clear the provider's cached user too, or it
+                  // keeps the signed-out user in context and this guard would let a
+                  // client-side navigation back into /dashboard render the shell.
+                  await refreshAuth();
                   router.push("/login");
                 }}
                   disabled={loggingOut} className="btn-ghost btn-icon btn-sm text-text-tertiary hover:text-red-500" title="Sign out" aria-label="Sign out">
