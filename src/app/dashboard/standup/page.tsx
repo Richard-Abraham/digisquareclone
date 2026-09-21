@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useWorkspace } from "@/lib/hooks";
 import { CheckIcon, SpinnerIcon } from "@/components/icons";
-import { CalendarDays, Plus, CalendarX } from "lucide-react";
+import { CalendarDays, Plus, CalendarX, FileText } from "lucide-react";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { Spinner, EmptyState } from "@/components/ui/States";
@@ -186,6 +187,9 @@ export default function StandupPage() {
           </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          <Link href="/dashboard/standup/report" className="btn-secondary btn-sm flex items-center gap-1.5">
+            <FileText size={14} /> Summary report
+          </Link>
           <input type="date" value={selectedDate} max={todayKey()} onChange={(e) => setSelectedDate(e.target.value || todayKey())}
             className="input-sm w-auto" aria-label="Select standup date" />
           <Tabs items={TABS} value={tab} onChange={(v) => setTab(v as "today" | "history")} />
