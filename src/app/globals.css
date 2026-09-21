@@ -247,3 +247,41 @@
 .driver-active-element {
   @apply rounded-lg;
 }
+
+/* Print: used by the standup report page (/dashboard/standup/report).
+   Everything chrome-like is hidden so the browser's print-to-PDF produces a
+   clean document. Keep these rules generic — do not add page-specific selectors. */
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .print-page {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Keep a person's section from being split across pages where possible. */
+  .print-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-break-before {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  a[href]::after { content: ""; }
+}
+
+.print-only { display: none; }
+
+@page {
+  margin: 16mm 14mm;
+}
