@@ -141,3 +141,74 @@ export function normalizeClientName(name: string): string {
 export function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
+
+// ── Standup report aggregation ────────────────────────────────────
+
+/** Inclusive list of local-day keys from `from` to `to`. Returns [] if from > to. */
+export function dateKeyRange(from: string, to: string): string[] {
+  const start = keyToDate(from);
+  const end = keyToDate(to);
+  if (start > end) return [];
+  const out: string[] = [];
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) out.push(dateToKey(d));
+  return out;
+}
+
+/** Default report window: the last `days` days ending today, inclusive. */
+export function defaultReportRange(days = 7, now: Date = new Date()): { from: string; to: string } {
+  const start = new Date(now);
+  start.setDate(start.getDate() - (days - 1));
+  return { from: dateToKey(start), to: dateToKey(now) };
+}
+
+/** Guard a user-supplied range: valid keys, from <= to, and at most `maxDays` wide. */
+export function isValidReportRange(from: string, to: string, maxDays = 186): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return false;
+  const start = keyToDate(from);
+  const end = keyToDate(to);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+  if (start > end) return false;
+  const days = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  return days <= maxDays;
+}
+
+export interface PersonReportTotals {
+  standups: number;
+  entries: number;
+  planned_tasks: number;
+  reported_tasks: number;
+  completed_tasks: number;
+  days_missed: number;
+}
+
+/** Roll a person's standups over a range into the totals shown in the summary table. */
+export function summarizePerson(
+  standups: Array<{ date: string; plan_tasks: unknown[]; report_tasks: Array<{ completed?: boolean }>; entries?: unknown[] }>,
+  rangeDays: number
+): PersonReportTotals {
+  let planned = 0, reported = 0, completed = 0, entries = 0;
+  for (const s of standups) {
+    planned += s.plan_tasks.length;
+    reported += s.report_tasks.length;
+    completed += s.report_tasks.filter((t) => t.completed).length;
+    entries += s.entries?.length ?? 0;
+  }
+  return {
+    standups: standups.length,
+    entries,
+    planned_tasks: planned,
+    reported_tasks: reported,
+    completed_tasks: completed,
+    days_missed: Math.max(0, rangeDays - standups.length),
+  };
+}
+
+/** RFC 4180 CSV field escaping. */
+export function csvCell(value: unknown): string {
+  const s = value == null ? "" : String(value);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+export function toCsv(rows: unknown[][]): string {
+  return rows.map((r) => r.map(csvCell).join(",")).join("\r\n");
+}
