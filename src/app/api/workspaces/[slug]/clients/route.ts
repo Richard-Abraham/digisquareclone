@@ -5,7 +5,7 @@ import { getAdmin } from "@/lib/supabase";
 import { getWorkspaceAccess } from "@/lib/access";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
-import { normalizeClientName } from "@/lib/tasks";
+import { normalizeClientName, escapeLikePattern } from "@/lib/tasks";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   try {
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     // case-insensitive name, matching the clients_workspace_name_idx constraint.
     const { data: existing } = await getAdmin().from("clients").select("*")
       .eq("workspace_id", access.workspace.id).is("archived_at", null)
-      .ilike("name", normalized).maybeSingle();
+      .ilike("name", escapeLikePattern(normalized)).maybeSingle();
     if (existing) return ok(existing, 200);
 
     const { data, error: e } = await getAdmin().from("clients")

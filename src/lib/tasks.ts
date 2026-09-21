@@ -136,3 +136,8 @@ export function requestTypeLabel(value: string | null | undefined): string {
 export function normalizeClientName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
+
+/** Escape LIKE/ILIKE wildcards so a client name is matched literally. */
+export function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}

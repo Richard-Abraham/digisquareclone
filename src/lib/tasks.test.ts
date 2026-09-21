@@ -4,7 +4,7 @@ import {
   todayKey, dateToKey, keyToDate, tallyActivity, subtaskProgress,
   isAssignableRole, roleLabel, MEMBER_ROLE, MANAGER_ROLE,
   assignmentNotificationKind, deriveIdentifier,
-  isRequestType, requestTypeLabel, normalizeClientName,
+  isRequestType, requestTypeLabel, normalizeClientName, escapeLikePattern,
 } from "./tasks";
 
 describe("isCompletedGroup", () => {
@@ -154,5 +154,20 @@ describe("normalizeClientName", () => {
   });
   it("collapses tabs and newlines to single spaces", () => {
     expect(normalizeClientName("\tAcme\nCorp ")).toBe("Acme Corp");
+  });
+});
+
+describe("escapeLikePattern", () => {
+  it("leaves a plain name unchanged", () => {
+    expect(escapeLikePattern("Acme Corp")).toBe("Acme Corp");
+  });
+  it("escapes an underscore wildcard", () => {
+    expect(escapeLikePattern("ACME_1")).toBe("ACME\\_1");
+  });
+  it("escapes a percent wildcard", () => {
+    expect(escapeLikePattern("50% Co")).toBe("50\\% Co");
+  });
+  it("escapes a literal backslash", () => {
+    expect(escapeLikePattern("a\\b")).toBe("a\\\\b");
   });
 });

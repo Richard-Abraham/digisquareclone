@@ -5,7 +5,7 @@ import { getUser } from "@/lib/auth";
 import { writeActivity } from "@/lib/activity";
 import { writeNotifications } from "@/lib/notifications";
 import { ensureProjectMembers, getProjectAccess } from "@/lib/access";
-import { assignmentNotificationKind, isRequestType, normalizeClientName } from "@/lib/tasks";
+import { assignmentNotificationKind, isRequestType, normalizeClientName, escapeLikePattern } from "@/lib/tasks";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import { resolveProfiles } from "@/lib/profiles";
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     } else if (body.client_name?.trim()) {
       const normalized = normalizeClientName(body.client_name);
       const { data: existingByName } = await getAdmin().from("clients").select("id")
-        .eq("workspace_id", project.workspace_id).is("archived_at", null).ilike("name", normalized).maybeSingle();
+        .eq("workspace_id", project.workspace_id).is("archived_at", null).ilike("name", escapeLikePattern(normalized)).maybeSingle();
       if (existingByName) {
         clientId = existingByName.id;
       } else {
