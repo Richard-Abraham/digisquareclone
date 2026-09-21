@@ -198,3 +198,47 @@
     @apply inline-block size-2 rounded-full flex-shrink-0;
   }
 }
+
+/* Product tour (driver.js) theming — src/components/tour/ProductTour.tsx.
+   driver.js renders its popover/overlay directly on <body>, outside any
+   component tree, so it's styled here against its own class names using the
+   app's semantic tokens rather than driver's hardcoded light-mode colors,
+   keeping it legible in both themes. */
+.driver-popover {
+  @apply bg-surface-1 text-text-primary border border-border shadow-elevated rounded-xl;
+}
+.driver-popover-title {
+  @apply text-text-primary font-display;
+}
+.driver-popover-description {
+  @apply text-text-secondary;
+}
+.driver-popover-close-btn {
+  @apply text-text-tertiary;
+}
+.driver-popover-close-btn:hover,
+.driver-popover-close-btn:focus {
+  @apply text-text-primary;
+}
+.driver-popover-progress-text {
+  @apply text-text-tertiary;
+}
+.driver-popover-footer button {
+  @apply bg-surface-2 text-text-secondary border border-border rounded-lg;
+}
+.driver-popover-footer button:hover,
+.driver-popover-footer button:focus {
+  @apply bg-surface-3 text-text-primary;
+}
+.driver-popover-next-btn {
+  @apply !bg-primary !text-text-inverse !border-primary;
+}
+.driver-popover-skip-btn {
+  @apply !bg-transparent !border-transparent !text-text-tertiary hover:!text-text-secondary;
+}
+.driver-popover-arrow {
+  border-color: rgb(var(--surface-1));
+}
+.driver-active-element {
+  @apply rounded-lg;
+}
