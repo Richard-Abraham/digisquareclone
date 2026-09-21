@@ -32,6 +32,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
     }
     if (Object.keys(updates).length === 0) return err("No valid fields to update");
 
+    if (updates.client_id) {
+      const { data: client } = await getAdmin().from("clients").select("id")
+        .eq("id", updates.client_id as string).eq("workspace_id", access.workspace.id).is("archived_at", null).maybeSingle();
+      if (!client) return err("Client not found", 404);
+    }
+
     const { data, error: ue } = await getAdmin()
       .from("credentials")
       .update(updates)

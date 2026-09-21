@@ -61,14 +61,12 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       }
     }
 
-    const enriched = rows.map((r: any) => {
-      const { ...rest } = r; // file_path is never selected above, so it cannot leak
-      return {
-        ...rest,
-        uploader: pm.get(r.uploaded_by) || null,
-        ...(access.isManager ? { access_count: accessCounts.get(r.id) || 0 } : {}),
-      };
-    });
+    // file_path is never selected above, so it cannot leak into this response.
+    const enriched = rows.map((r: any) => ({
+      ...r,
+      uploader: pm.get(r.uploaded_by) || null,
+      ...(access.isManager ? { access_count: accessCounts.get(r.id) || 0 } : {}),
+    }));
 
     return ok(enriched);
   } catch (e) {
@@ -99,6 +97,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
 
     const check = checkFile({ mimeType: file.type, sizeBytes: file.size, fileName: file.name });
     if (!check.okFile) return err(check.reason!, 400);
+
+    if (clientId) {
+      const { data: client } = await getAdmin().from("clients").select("id")
+        .eq("id", clientId).eq("workspace_id", access.workspace.id).is("archived_at", null).maybeSingle();
+      if (!client) return err("Client not found", 404);
+    }
 
     const { data: row, error: ie } = await getAdmin()
       .from("credentials")
