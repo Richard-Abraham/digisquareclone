@@ -3,7 +3,7 @@ import { getAdmin } from "@/lib/supabase";
 import { ok, err } from "@/lib/response";
 import { getUser } from "@/lib/auth";
 import { writeActivity } from "@/lib/activity";
-import { reviewerTransitions, isCompletedGroup } from "@/lib/tasks";
+import { reviewerTransitions, isCompletedGroup, isRequestType } from "@/lib/tasks";
 import { getProjectAccess } from "@/lib/access";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     }
     if (!(await getProjectAccess(params.projectId, user.id))) return err("Access denied", 403);
     const { data } = await getAdmin().from("issues").select(
-      "*, state:states(*), assignees:issue_assignees(user_id), tags:issue_tags(tag_id)"
+      "*, state:states(*), assignees:issue_assignees(user_id), tags:issue_tags(tag_id), client:clients(id, name)"
     ).eq("id", params.issueId).single();
     if (!data) return err("Not found", 404);
 
@@ -57,7 +57,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
     const ALLOWED_COLUMNS = new Set([
       "name", "description_html", "priority", "state_id", "assignee_id",
       "is_bug", "is_draft", "start_date", "target_date", "parent_id", "sort_order",
+      "client_id", "request_type", "requested_by", "requested_at",
     ]);
+    if (body.request_type !== undefined && !isRequestType(body.request_type)) return err("Invalid request_type");
     const { assignee_ids, reviewer_ids, tag_ids, ...rest } = body;
     const updates: Record<string, unknown> = { updated_by: user.id };
     for (const [key, value] of Object.entries(rest)) {
@@ -71,7 +73,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { slug: stri
       updates.completed_at = isCompletedGroup(toGroup) ? new Date().toISOString() : null;
     }
 
-    const { data, error: ue } = await getAdmin().from("issues").update(updates).eq("id", params.issueId).select("*, state:states(*)").single();
+    const { data, error: ue } = await getAdmin().from("issues").update(updates).eq("id", params.issueId).select("*, state:states(*), client:clients(id, name)").single();
     if (ue) return err(ue.message, 400);
 
     // Reviewer-state transitions when the state group changes.

@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     if (!access) return err("Access denied", 403);
 
     const [issueRes, statesRes, tagsRes, subtasksRes, commentsRes, reviewersRes, activityRes, membersRes] = await Promise.all([
-      getAdmin().from("issues").select("*, state:states(*), assignees:issue_assignees(user_id), tags:issue_tags(tag_id)").eq("id", params.issueId).single(),
+      getAdmin().from("issues").select("*, state:states(*), assignees:issue_assignees(user_id), tags:issue_tags(tag_id), client:clients(id, name)").eq("id", params.issueId).single(),
       getAdmin().from("states").select("*").eq("project_id", params.projectId).order("sequence"),
       getAdmin().from("tags").select("*").eq("workspace_id", access.workspaceId),
       getAdmin().from("issue_subtasks").select("*").eq("issue_id", params.issueId).order("order_index"),

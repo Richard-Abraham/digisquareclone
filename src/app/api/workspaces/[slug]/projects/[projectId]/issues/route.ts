@@ -26,6 +26,10 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     const search = url.searchParams.get("search");
     const bugs = url.searchParams.get("bugs");
     const tag = url.searchParams.get("tag");
+    const client = url.searchParams.get("client");
+    const requestType = url.searchParams.get("requestType");
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
     const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get("pageSize") || "50", 10)));
     const offset = (page - 1) * pageSize;
@@ -51,13 +55,17 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     }
 
     let q = getAdmin().from("issues").select(
-      "*, state:states(*), assignees:issue_assignees(user_id), tags:issue_tags(tag_id), subtasks:issue_subtasks(done), reviewers:issue_reviewers(user_id, state)",
+      "*, state:states(*), assignees:issue_assignees(user_id), tags:issue_tags(tag_id), subtasks:issue_subtasks(done), reviewers:issue_reviewers(user_id, state), client:clients(id, name)",
       { count: "exact" }
     ).eq("project_id", params.projectId).is("archived_at", null).eq("is_draft", false).order("sort_order").order("sequence_id", { ascending: false }).range(offset, offset + pageSize - 1);
     if (state) q = q.eq("state_id", state);
     if (priority) q = q.eq("priority", priority);
     if (search) q = q.ilike("name", `%${search}%`);
     if (bugs === "true") q = q.eq("is_bug", true);
+    if (client) q = q.eq("client_id", client);
+    if (requestType) q = q.eq("request_type", requestType);
+    if (from) q = q.gte("requested_at", from);
+    if (to) q = q.lte("requested_at", to);
     if (preFilterIntersection !== null) {
       const ids = Array.from(preFilterIntersection);
       if (ids.length === 0) return ok({ issues: [], total: 0, page, pageSize });
