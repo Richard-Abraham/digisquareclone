@@ -11,6 +11,13 @@
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Reconciled at `14e3d0b`.** Every file this plan quotes — the tags route,
+> `src/lib/access.ts`, `src/lib/supabase.ts`, `src/lib/rate-limit.ts` and
+> `src/app/dashboard/members/page.tsx` — was re-verified unchanged. `src/lib/api.ts`
+> changed only in its `DEFAULT_TIMEOUT` constant (now `30_000`); the `api()` signature and
+> its inability to send `FormData` are unchanged, which is all this plan relies on.
+> **Migrations `0011` and `0012` are now taken and applied — your migration is `0013`.**
 
 ## Status
 
@@ -18,11 +25,11 @@
 - **Effort**: L
 - **Risk**: MED — this feature stores customer credentials. A missed access check here
   leaks production secrets, not just task titles.
-- **Depends on**: `plans/003-client-request-tracking.md` (soft; 003 adds migration `0011`, so this one is `0012` — only for the optional
+- **Depends on**: `plans/003-client-request-tracking.md` — **already merged**, so the `clients` table exists and the `credentials.client_id` foreign key can be added unconditionally (soft dependency now satisfied — only for the optional
   `client_id` link on a credential; if 003 is not done, omit that column and its filter,
   and add it later)
 - **Category**: direction (new feature) / security
-- **Planned at**: commit `a4a8db7`, 2026-09-21
+- **Planned at**: commit `14e3d0b`, 2026-09-21 (re-stamped; migration renumbered to 0013)
 - **Supersedes**: the earlier revision written against `687fba7`, authored from a checkout
   50 commits stale.
 
@@ -322,7 +329,7 @@ migration file, report the DB CHANGE notice, and let the operator apply it.
 ## Scope
 
 **In scope** (the only files you may modify or create):
-- `supabase/migrations/0012_credentials_vault.sql` (create)
+- `supabase/migrations/0013_credentials_vault.sql` (create)
 - `src/lib/credentials.ts` (create — pure validation helpers)
 - `src/lib/credentials.test.ts` (create)
 - `src/lib/credential-access.ts` (create — the shared access resolver, does I/O)
@@ -358,7 +365,7 @@ migration file, report the DB CHANGE notice, and let the operator apply it.
 
 ### Step 1: Write the migration and create the private bucket
 
-Create `supabase/migrations/0012_credentials_vault.sql`:
+Create `supabase/migrations/0013_credentials_vault.sql`:
 
 ```sql
 -- Credentials vault: client/system credential documents with an explicit
@@ -459,7 +466,7 @@ Print this notice to the operator verbatim and wait for acknowledgement before c
 
 > **DB CHANGE**: new private Storage bucket `credentials`; new tables `credentials`,
 > `credential_access`, `credential_audit` with indexes and a CHECK constraint — run this
-> SQL: `npm run migrate` (applies `supabase/migrations/0012_credentials_vault.sql`)
+> SQL: `npm run migrate` (applies `supabase/migrations/0013_credentials_vault.sql`)
 
 **Verify**: `npm run migrate` → exit 0. Then confirm the bucket exists and is private in
 the Supabase dashboard (Storage → `credentials` → its visibility must read **Private**).
@@ -816,7 +823,7 @@ ALL must hold:
 
 - [ ] `npx tsc --noEmit -p tsconfig.json` exits 0 with no TypeScript errors
 - [ ] `npm test` exits 0; `src/lib/credentials.test.ts` exists with the traversal assertion and passes
-- [ ] `npm run migrate` applied `0012_credentials_vault.sql` successfully
+- [ ] `npm run migrate` applied `0013_credentials_vault.sql` successfully
 - [ ] The `credentials` bucket is **Private** in the Supabase dashboard
 - [ ] Every new route file contains both `getUser(` and `getWorkspaceAccess(`:
       `grep -L "getWorkspaceAccess" src/app/api/workspaces/\[slug\]/credentials/**/*.ts` returns nothing

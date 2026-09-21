@@ -11,6 +11,14 @@
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Reconciled at `14e3d0b`.** `src/lib/standup.ts` and every route under
+> `src/app/api/workspaces/[slug]/standup/` were re-verified unchanged, so this plan's
+> excerpts of them still hold. Two things did move and are already corrected below:
+> `package.json` gained `driver.js`, and `src/app/globals.css` gained a block of
+> driver.js tooltip theming at its end. `grep -c "@media print" src/app/globals.css`
+> still returns **0**, so this plan still adds the first print rules — append them at the
+> very end of the file, after that tour block, not in the middle of it.
 
 ## Status
 
@@ -19,7 +27,7 @@
 - **Risk**: LOW
 - **Depends on**: none
 - **Category**: direction (new feature)
-- **Planned at**: commit `a4a8db7`, 2026-09-21
+- **Planned at**: commit `14e3d0b`, 2026-09-21 (re-stamped and reconciled)
 - **Supersedes**: the earlier revision written against `687fba7`, authored from a checkout
   50 commits stale. The standup storage format changed in the interim — see the new
   "Standup text is structured now" section, which replaces the old assumption that
@@ -37,7 +45,8 @@ and two exports (PDF and CSV).
 
 The project has **no PDF dependency today** (`package.json` dependencies are `@dnd-kit/*`,
 `@hookform/resolvers`, `@supabase/supabase-js`, `@tanstack/react-query`, `clsx`,
-`lucide-react`, `next`, `react`, `react-dom`, `react-hook-form`, `recharts`, `sonner`, `zod`) and deploys to serverless platforms (`vercel.json` and `netlify.toml` are both
+`driver.js`, `lucide-react`, `next`, `react`, `react-dom`, `react-hook-form`, `recharts`,
+`sonner`, `zod`) and deploys to serverless platforms (`vercel.json` and `netlify.toml` are both
 present), where a headless browser for PDF rendering is impractical — the Chromium binary
 alone blows past the function bundle size limit on both.
 
@@ -581,8 +590,9 @@ see `src/lib/auth.ts:4-12` — so no Authorization header is needed for this one
 
 ### Step 4: Add the print stylesheet
 
-In `src/app/globals.css`, **after** the closing brace of the existing
-`@layer components { … }` block at the end of the file, append:
+In `src/app/globals.css`, append at the **very end of the file** — after the existing
+`@layer components { … }` block and after the driver.js tooltip theming block that now
+follows it (the rules starting `.driver-popover…`). Do not insert into either block:
 
 ```css
 /* Print: used by the standup report page (/dashboard/standup/report).
