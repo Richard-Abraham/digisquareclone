@@ -255,6 +255,28 @@
   .no-print { display: none !important; }
   .print-only { display: block !important; }
 
+  /* The dashboard chrome lives outside the report itself. Hiding .no-print alone
+     left the sidebar on the page (verified in a browser), so drop the nav landmarks
+     too. */
+  aside,
+  nav {
+    display: none !important;
+  }
+
+  /* Every surface in this app paints its own background from a theme token, so
+     whitening only <body> still printed a dark page in dark mode. Strip the paint
+     from everything, then set the page's own ground explicitly. */
+  *,
+  *::before,
+  *::after {
+    background-image: none !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    color: #000 !important;
+    border-color: #999 !important;
+  }
+
+  html,
   body {
     background: #fff !important;
     color: #000 !important;

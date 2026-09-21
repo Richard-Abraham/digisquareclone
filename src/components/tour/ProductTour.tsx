@@ -25,6 +25,7 @@ export function ProductTour({ open, onFinish }: ProductTourProps) {
     let cancelled = false;
     let driverObj: Driver | null = null;
     let raf2 = 0;
+    let onSkipClick: ((e: MouseEvent) => void) | null = null;
 
     // Wait a couple of frames before reading the DOM: `open` can flip to true
     // in the same tick the dashboard's own data finishes loading and its
@@ -64,11 +65,14 @@ export function ProductTour({ open, onFinish }: ProductTourProps) {
           nextBtnText: "Next",
           doneBtnText: "Done",
           onPopoverRender: (popover) => {
+            // Only build the element here. The click is handled by a delegated
+            // listener below: driver.js re-renders the popover between steps, and a
+            // listener attached directly to this node does not survive that — the
+            // button renders but does nothing (verified in a browser).
             const skipBtn = document.createElement("button");
             skipBtn.type = "button";
             skipBtn.className = "driver-popover-skip-btn";
             skipBtn.textContent = "Skip";
-            skipBtn.addEventListener("click", () => obj.destroy());
             popover.footerButtons.insertBefore(skipBtn, popover.footerButtons.firstChild);
           },
           onDestroyed: finish,
@@ -83,6 +87,22 @@ export function ProductTour({ open, onFinish }: ProductTourProps) {
           })),
         });
 
+        // Delegated so it keeps working across driver.js's popover re-renders.
+        onSkipClick = (e: MouseEvent) => {
+          const target = e.target as HTMLElement | null;
+          if (target?.closest?.(".driver-popover-skip-btn")) {
+            e.preventDefault();
+            e.stopPropagation();
+            // Call finish() explicitly rather than relying on onDestroyed firing for a
+            // programmatic destroy — verified in a browser that Skip otherwise closed
+            // the tour without persisting, so it came back on the next load. The
+            // `finished` latch makes this safe if onDestroyed fires as well.
+            finish();
+            obj.destroy();
+          }
+        };
+        document.addEventListener("click", onSkipClick, true);
+
         driverObj = obj;
         obj.drive();
       });
@@ -92,6 +112,7 @@ export function ProductTour({ open, onFinish }: ProductTourProps) {
       cancelled = true;
       cancelAnimationFrame(raf1);
       cancelAnimationFrame(raf2);
+      if (onSkipClick) document.removeEventListener("click", onSkipClick, true);
       if (driverObj && driverObj.isActive()) driverObj.destroy();
     };
   }, [open]);

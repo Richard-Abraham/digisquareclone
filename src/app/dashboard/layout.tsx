@@ -181,7 +181,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* Sidebar */}
-      <aside aria-label="Main navigation" data-tour="sidebar" className={`
+      <aside aria-label="Main navigation" data-tour="sidebar" className={`no-print 
         fixed inset-y-0 left-0 z-50 w-64 bg-surface-1 border-r border-border flex flex-col
         bg-gradient-to-b from-surface-1 to-surface
         transform transition-transform duration-200 ease-in-out
