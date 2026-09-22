@@ -14,13 +14,17 @@ STOP conditions, and update your row below when done.
 |---|------|----------|--------|------|------------|--------|
 | 001 | [Issue detail enrichment](./001-issue-detail-enrichment.md) | — | — | — | — | Implemented |
 | 002 | [Profile backfill & display names](./002-profile-backfill-and-display-names.md) | — | — | — | — | Draft |
-| 003 | [Client request tracking](./003-client-request-tracking.md) | P1 | M | LOW | — | DONE (reviewed) — on branch `feat/003-client-request-tracking`, unmerged; migration `0011` not yet applied |
-| 004 | [Credentials vault](./004-credentials-vault.md) | P1 | L | MED | 003 (soft) | TODO — updated for `a4a8db7`; re-verify excerpts before executing |
-| 005 | [Standup summary report](./005-standup-summary-report.md) | P2 | M | LOW | — | TODO — updated for `a4a8db7`; re-verify excerpts before executing |
-| 006 | [Dashboard performance + owner visibility](./006-dashboard-performance-and-owner-visibility.md) | P1 | M | MED | — | TODO — authored against `e50af2b` |
-| 007 | [First-run product tour](./007-first-run-product-tour.md) | P2 | M | LOW | 006 (file overlap) | TODO — authored against `e50af2b` |
+| 003 | [Client request tracking](./003-client-request-tracking.md) | P1 | M | LOW | — | **DONE** — merged; migration `0011` applied; verified against a live DB |
+| 004 | [Credentials vault](./004-credentials-vault.md) | P1 | L | MED | 003 | **DONE** — merged; migration `0013` applied; access model verified end to end |
+| 005 | [Standup summary report](./005-standup-summary-report.md) | P2 | M | LOW | — | **DONE** — merged; no migration; print layout verified in a browser |
+| 006 | [Dashboard performance + owner visibility](./006-dashboard-performance-and-owner-visibility.md) | P1 | M | MED | — | **DONE** — merged; ES256 local JWT verification live |
+| 007 | [First-run product tour](./007-first-run-product-tour.md) | P2 | M | LOW | 006 | **DONE** — merged; migration `0012` applied; tour verified in a browser |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
+
+**All of 003–007 are merged, deployed and their migrations applied.** Plans 001 and 002
+predate this run and have not been reconciled against current code — treat them as stale.
+What remains is *verification*, not implementation: see `Digisystem UAT Checklist.xlsx`.
 
 Plans 001 and 002 were written against commits `d0fe018` (001) and `d8b297b` (002) and have
 NOT been revisited against `a4a8db7` — treat them as stale until reconciled.
