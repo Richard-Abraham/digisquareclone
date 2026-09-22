@@ -88,7 +88,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       tourAutoStartedRef.current = true;
       setTourOpen(true);
     }
-  }, [profile]);
+  }, [profile, ready]);
+
+  // Could not start in time (the board had not painted). Close without recording it,
+  // and release the latch so the next visit can try again — otherwise a single slow
+  // load would cost the user the tour permanently.
+  const handleTourAbort = useCallback(() => {
+    setTourOpen(false);
+    tourAutoStartedRef.current = false;
+  }, []);
 
   const handleTourFinish = useCallback(async () => {
     setTourOpen(false);
@@ -379,7 +387,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         onClose={() => setHelpOpen(false)}
         onStartTour={() => setTourOpen(true)}
       />
-      <ProductTour open={tourOpen} onFinish={handleTourFinish} />
+      <ProductTour open={tourOpen} onFinish={handleTourFinish} onAbort={handleTourAbort} />
     </div>
   );
 }

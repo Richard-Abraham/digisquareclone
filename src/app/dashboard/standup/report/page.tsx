@@ -31,7 +31,7 @@ interface ReportPayload {
 }
 
 const activityItems: { key: keyof ActivitySummary; label: string }[] = [
-  { key: "completed", label: "Completed" },
+  { key: "completed", label: "Completed (board)" },
   { key: "created", label: "Created" },
   { key: "commented", label: "Commented" },
   { key: "reviewed", label: "Reviewed" },
@@ -188,7 +188,7 @@ export default function StandupReportPage() {
                   <th className="px-3 py-2.5">Missed</th>
                   <th className="px-3 py-2.5">Planned</th>
                   <th className="px-3 py-2.5">Reported</th>
-                  <th className="px-3 py-2.5">Completed</th>
+                  <th className="px-3 py-2.5">Completed (standup)</th>
                   {activityItems.map((a) => <th key={a.key} className="px-3 py-2.5">{a.label}</th>)}
                 </tr>
               </thead>
