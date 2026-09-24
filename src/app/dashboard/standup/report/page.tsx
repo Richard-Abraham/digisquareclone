@@ -119,13 +119,23 @@ export default function StandupReportPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="secondary" size="sm" onClick={() => window.print()}>
-              <span className="flex items-center gap-1.5"><Printer size={14} /> Download PDF</span>
+            <Button variant="primary" size="sm" onClick={downloadCsv}>
+              <span className="flex items-center gap-1.5"><Download size={14} /> Download weekly report</span>
             </Button>
-            <Button variant="secondary" size="sm" onClick={downloadCsv}>
-              <span className="flex items-center gap-1.5"><Download size={14} /> Download CSV</span>
+            <Button variant="secondary" size="sm" onClick={() => window.print()}>
+              <span className="flex items-center gap-1.5"><Printer size={14} /> PDF / print</span>
             </Button>
           </div>
+        </div>
+
+        <div className="card p-4 mb-5 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-primary-50 to-surface-2 dark:from-primary-500/10 dark:to-surface-2">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary mb-1">Weekly snapshot</p>
+            <p className="text-sm font-semibold text-text-primary">{formatRange(from, to)}</p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={downloadCsv}>
+            <span className="flex items-center gap-1.5"><Download size={14} /> Download CSV</span>
+          </Button>
         </div>
 
         <div className="card p-4 mb-5 flex flex-wrap items-end gap-3">

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/providers";
@@ -31,6 +32,7 @@ const NOTIF_DESCS: Record<string, string> = {
 export default function ProfilePage() {
   const { user, profile, ready, refresh } = useAuth();
   const { theme, setTheme } = useTheme();
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("profile");
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
@@ -88,7 +90,10 @@ export default function ProfilePage() {
     setSaving(true); setMsg(null); setSaved(false);
     try {
       await api("/api/auth/me", { method: "PATCH", body: { display_name: name } });
-      setSaved(true); refresh();
+      queryClient.invalidateQueries({ queryKey: ["members"] });
+      queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      setSaved(true);
+      await refresh();
     }
     catch (e: any) { setMsg(e.message); toast.error("Failed to save name"); } finally { setSaving(false); }
   }

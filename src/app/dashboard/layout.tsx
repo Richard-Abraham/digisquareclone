@@ -196,7 +196,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         lg:static lg:translate-x-0
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
-        {/* Logo + workspace */}
+        {/* Logo */}
         <div className="flex-shrink-0">
           <div className="flex items-center gap-2 px-5 h-16 border-b border-border-subtle">
             <button onClick={() => setSidebarOpen(false)} className="lg:hidden btn-ghost btn-icon btn-sm -ml-2 mr-1" aria-label="Close sidebar">
@@ -204,16 +204,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             <Logo size={34} wordmarkClassName="text-[17px]" />
           </div>
-          {workspaceName && (
-            <div className="px-5 py-2.5 border-b border-border-subtle bg-surface-2/30">
-              <div className="flex items-center gap-2">
-                <div className="size-6 rounded-lg bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
-                  {workspaceName[0]?.toUpperCase()}
-                </div>
-                <span className="text-xs font-semibold text-text-secondary truncate">{workspaceName}</span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Nav */}

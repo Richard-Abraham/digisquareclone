@@ -76,7 +76,7 @@ export function ProductTour({ open, onFinish, onAbort }: ProductTourProps) {
         prevBtnText: "Back",
         nextBtnText: "Next",
         doneBtnText: "Done",
-        onPopoverRender: (popover) => {
+        onPopoverRender: (popover: any) => {
           // Only build the element here. The click is handled by a delegated
           // listener below: driver.js re-renders the popover between steps, and a
           // listener attached directly to this node does not survive that — the
